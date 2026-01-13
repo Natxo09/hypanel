@@ -140,3 +140,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom Window Titlebar */
+.window-titlebar {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* macOS traffic light hover effect */
+.macos-controls:hover button {
+  opacity: 1;
+}
+
+/* Prevent text selection on titlebar */
+.window-titlebar * {
+  -webkit-user-select: none;
+  user-select: none;
+}

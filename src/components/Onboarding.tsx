@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { WindowTitlebar } from "@/components/layout/WindowTitlebar";
 import type { JavaInfo, SystemPaths, FileSourceType, CopyResult, DownloaderInfo, DownloadProgress, DownloadResult, InstallCliResult, ServerFilesStatus, InstanceResult } from "@/lib/types";
 
 function StatusIcon({ ok, loading }: { ok: boolean; loading?: boolean }) {
@@ -275,8 +276,10 @@ export function Onboarding() {
   const canProceedFromStep3 = copyResult?.success || downloadResult?.success || serverFilesStatus?.exists || false;
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-8">
-      <div className="max-w-lg w-full space-y-6">
+    <div className="h-screen bg-background flex flex-col">
+      <WindowTitlebar />
+      <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
+        <div className="max-w-lg w-full space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">HyPanel</h1>
@@ -771,6 +774,7 @@ export function Onboarding() {
           {step === 1 && "Choose your preferred method to obtain server files."}
           {step === 2 && "Select a folder where your server instance will be created."}
         </p>
+        </div>
       </div>
     </div>
   );

@@ -11,9 +11,6 @@ interface PageHeaderProps {
 export function PageHeader({ title, backButton, onBack, children }: PageHeaderProps) {
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      {/* Drag region */}
-      <div data-tauri-drag-region className="h-3" />
-
       {/* Header content */}
       <div className="flex h-12 items-center justify-between px-4">
         <div className="flex items-center gap-3">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Loader2 } from "lucide-react";
+import { WindowTitlebar } from "@/components/layout/WindowTitlebar";
 import { IconSidebar, type View } from "@/components/layout/IconSidebar";
 import { HomeView } from "@/components/views/HomeView";
 import { ServersView } from "@/components/views/ServersView";
@@ -55,17 +56,22 @@ export function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex flex-col h-screen bg-background">
+        <WindowTitlebar />
+        <div className="flex flex-1 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <IconSidebar currentView={currentView} onViewChange={setCurrentView} />
+    <div className="flex flex-col h-screen bg-background">
+      <WindowTitlebar />
+      <div className="flex flex-1 min-h-0">
+        <IconSidebar currentView={currentView} onViewChange={setCurrentView} />
 
-      <div className="flex flex-1 flex-col min-w-0">
+        <div className="flex flex-1 flex-col min-w-0">
         {error && (
           <div className="m-4 mb-0 rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
             {error}
@@ -96,6 +102,7 @@ export function Dashboard() {
         {currentView === "backups" && <BackupsView />}
 
         {currentView === "settings" && <SettingsView />}
+        </div>
       </div>
     </div>
   );
