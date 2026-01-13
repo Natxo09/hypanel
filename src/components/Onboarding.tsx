@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   CheckCircle2,
@@ -23,13 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { JavaInfo, SystemPaths, FileSourceType, CopyResult } from "@/lib/types";
-
-interface DownloaderStatus {
-  available: boolean;
-  path: string | null;
-  error: string | null;
-}
+import type { JavaInfo, SystemPaths, FileSourceType, CopyResult, DownloaderInfo, DownloadProgress, DownloadResult } from "@/lib/types";
 
 function StatusIcon({ ok, loading }: { ok: boolean; loading?: boolean }) {
   if (loading) {
@@ -70,13 +65,18 @@ export function Onboarding() {
 
   // Step 2: File source
   const [paths, setPaths] = useState<SystemPaths | null>(null);
-  const [downloader, setDownloader] = useState<DownloaderStatus | null>(null);
+  const [downloader, setDownloader] = useState<DownloaderInfo | null>(null);
   const [selectedSource, setSelectedSource] = useState<FileSourceType | null>(null);
 
   // Step 3: Instance setup
   const [destinationPath, setDestinationPath] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
   const [copyResult, setCopyResult] = useState<CopyResult | null>(null);
+
+  // Download state
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+  const [downloadResult, setDownloadResult] = useState<DownloadResult | null>(null);
 
   // Check system on mount
   useEffect(() => {
@@ -91,7 +91,7 @@ export function Onboarding() {
       const [javaInfo, pathsInfo, downloaderInfo] = await Promise.all([
         invoke<JavaInfo>("check_java"),
         invoke<SystemPaths>("get_system_paths"),
-        invoke<DownloaderStatus>("check_downloader"),
+        invoke<DownloaderInfo>("get_downloader_info"),
       ]);
 
       setJava(javaInfo);
@@ -140,9 +140,38 @@ export function Onboarding() {
     }
   }
 
+  async function downloadFiles() {
+    if (!destinationPath) return;
+
+    setDownloading(true);
+    setDownloadProgress(null);
+    setDownloadResult(null);
+
+    // Listen for progress events
+    const unlisten = await listen<DownloadProgress>("download-progress", (event) => {
+      setDownloadProgress(event.payload);
+    });
+
+    try {
+      const result = await invoke<DownloadResult>("download_server_files", {
+        destination: destinationPath,
+      });
+      setDownloadResult(result);
+    } catch (err) {
+      setDownloadResult({
+        success: false,
+        output_path: null,
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setDownloading(false);
+      unlisten();
+    }
+  }
+
   const canProceedFromStep1 = java?.is_valid;
   const canProceedFromStep2 = selectedSource !== null;
-  const canProceedFromStep3 = copyResult?.success || false;
+  const canProceedFromStep3 = copyResult?.success || downloadResult?.success || false;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-8">
@@ -308,7 +337,7 @@ export function Onboarding() {
                     {!downloader?.available && (
                       <Button variant="link" className="h-auto p-0 mt-2" asChild>
                         <a
-                          href="https://github.com/AltriusRS/hytale-downloader"
+                          href="https://downloader.hytale.com/hytale-downloader.zip"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -422,17 +451,88 @@ export function Onboarding() {
               {selectedSource === "download" && destinationPath && (
                 <div className="space-y-3">
                   {downloader?.available ? (
-                    <div className="p-4 rounded-lg border bg-muted/50">
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Run this command in your terminal to download server files:
-                      </p>
-                      <code className="block p-3 rounded bg-background text-sm font-mono break-all">
-                        hytale-downloader --output "{destinationPath}"
-                      </code>
-                      <p className="text-xs text-muted-foreground mt-3">
-                        You will need to authenticate with your Hytale account.
-                      </p>
-                    </div>
+                    <>
+                      {/* Version info */}
+                      {downloader.game_version && (
+                        <div className="p-3 rounded-lg border bg-muted/50 text-sm">
+                          <span className="text-muted-foreground">Game version: </span>
+                          <span className="font-mono">{downloader.game_version}</span>
+                        </div>
+                      )}
+
+                      {/* Download button */}
+                      {!downloadResult && (
+                        <Button
+                          onClick={downloadFiles}
+                          disabled={downloading}
+                          className="w-full"
+                        >
+                          {downloading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                              {downloadProgress?.status === "authenticating"
+                                ? "Waiting for authentication..."
+                                : "Downloading..."}
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-2" />
+                              Download Server Files
+                            </>
+                          )}
+                        </Button>
+                      )}
+
+                      {/* Progress display */}
+                      {downloading && downloadProgress && (
+                        <div className="p-4 rounded-lg border bg-muted/50 space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="capitalize">{downloadProgress.status}</span>
+                            {downloadProgress.percentage !== null && (
+                              <span>{downloadProgress.percentage.toFixed(1)}%</span>
+                            )}
+                          </div>
+                          {downloadProgress.percentage !== null && (
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary transition-all duration-300"
+                                style={{ width: `${downloadProgress.percentage}%` }}
+                              />
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground truncate">
+                            {downloadProgress.message}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Result display */}
+                      {downloadResult && (
+                        <div
+                          className={`p-4 rounded-lg border ${
+                            downloadResult.success
+                              ? "bg-green-500/10 border-green-500/20"
+                              : "bg-destructive/10 border-destructive/20"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <StatusIcon ok={downloadResult.success} />
+                            <div>
+                              <p className="font-medium">
+                                {downloadResult.success
+                                  ? "Download completed!"
+                                  : "Download failed"}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {downloadResult.success
+                                  ? downloadResult.output_path
+                                  : downloadResult.error}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="p-4 rounded-lg border bg-amber-500/10 border-amber-500/20">
                       <p className="text-sm">
@@ -443,7 +543,7 @@ export function Onboarding() {
                       </p>
                       <Button variant="outline" size="sm" className="mt-3" asChild>
                         <a
-                          href="https://github.com/AltriusRS/hytale-downloader"
+                          href="https://downloader.hytale.com/hytale-downloader.zip"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -462,7 +562,7 @@ export function Onboarding() {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
               </Button>
-              {(copyResult?.success || selectedSource === "download") && (
+              {canProceedFromStep3 && (
                 <Button className="flex-1">
                   Finish Setup
                   <ArrowRight className="w-4 h-4 ml-2" />

@@ -1,8 +1,8 @@
 mod commands;
 
 use commands::{
-    check_downloader, check_java, copy_server_files, create_instance, get_system_paths,
-    validate_server_files,
+    check_downloader, check_downloader_update, check_java, copy_server_files, create_instance,
+    download_server_files, get_downloader_info, get_system_paths, validate_server_files,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,7 +16,10 @@ pub fn run() {
             copy_server_files,
             check_downloader,
             create_instance,
-            validate_server_files
+            validate_server_files,
+            get_downloader_info,
+            check_downloader_update,
+            download_server_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

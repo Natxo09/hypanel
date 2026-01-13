@@ -76,6 +76,9 @@ claude.json
 tmpclaude-*
 .mcp.json
 
+# Hytale Downloader
+.hytale-downloader-credentials.json
+
 # Misc
 *.pem
 *.p12

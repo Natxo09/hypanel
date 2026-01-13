@@ -33,6 +33,13 @@ export interface OnboardingState {
   launcherAvailable: boolean;
 }
 
+export interface CopyResult {
+  success: boolean;
+  files_copied: number;
+  destination: string;
+  error: string | null;
+}
+
 export interface CopyProgress {
   current: number;
   total: number;
@@ -42,8 +49,21 @@ export interface CopyProgress {
 }
 
 export interface DownloadProgress {
-  stage: "authenticating" | "downloading" | "extracting" | "done" | "error";
-  progress: number;
+  status: string;
+  percentage: number | null;
   message: string;
+}
+
+export interface DownloaderInfo {
+  available: boolean;
+  cli_version: string | null;
+  game_version: string | null;
+  path: string | null;
+  error: string | null;
+}
+
+export interface DownloadResult {
+  success: boolean;
+  output_path: string | null;
   error: string | null;
 }
