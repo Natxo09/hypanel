@@ -1,7 +1,7 @@
-import { Server, Plus, Play } from "lucide-react";
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { Server, Plus, Play, Square, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -11,19 +11,97 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/layout/PageHeader";
-import type { Instance } from "@/lib/types";
+import type { Instance, StartResult, StopResult, ServerMetrics } from "@/lib/types";
 
 interface ServersViewProps {
   instances: Instance[];
+  serverStatuses: Map<string, string>;
   onSelectInstance: (instance: Instance) => void;
   onAddInstance: () => void;
 }
 
 export function ServersView({
   instances,
+  serverStatuses,
   onSelectInstance,
   onAddInstance,
 }: ServersViewProps) {
+  const [serverMetrics, setServerMetrics] = useState<Map<string, ServerMetrics>>(new Map());
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+
+  // Fetch metrics for running servers
+  useEffect(() => {
+    async function fetchMetrics() {
+      try {
+        const metrics = await invoke<ServerMetrics[]>("get_all_server_metrics");
+        const metricsMap = new Map<string, ServerMetrics>();
+        metrics.forEach((m) => metricsMap.set(m.instance_id, m));
+        setServerMetrics(metricsMap);
+      } catch (err) {
+        console.error("Failed to fetch metrics:", err);
+      }
+    }
+
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  function getStatus(instanceId: string): string {
+    return serverStatuses.get(instanceId) || "stopped";
+  }
+
+  async function handleStart(e: React.MouseEvent, instance: Instance) {
+    e.stopPropagation();
+    setLoadingAction(instance.id);
+
+    try {
+      await invoke<StartResult>("start_server", {
+        instanceId: instance.id,
+        instancePath: instance.path,
+        javaPath: instance.java_path,
+        jvmArgs: instance.jvm_args,
+        serverArgs: instance.server_args,
+      });
+    } catch (err) {
+      console.error("Failed to start server:", err);
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  async function handleStop(e: React.MouseEvent, instance: Instance) {
+    e.stopPropagation();
+    setLoadingAction(instance.id);
+
+    try {
+      await invoke<StopResult>("stop_server", {
+        instanceId: instance.id,
+      });
+    } catch (err) {
+      console.error("Failed to stop server:", err);
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  function formatUptime(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hours < 24) return `${hours}h ${mins}m`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h`;
+  }
+
+  function formatMemory(mb: number): string {
+    if (mb >= 1024) {
+      return `${(mb / 1024).toFixed(1)} GB`;
+    }
+    return `${Math.round(mb)} MB`;
+  }
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="Servers">
@@ -35,76 +113,124 @@ export function ServersView({
 
       <div className="flex-1 overflow-y-auto p-4">
         {instances.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <Server className="h-12 w-12 mb-4 text-muted-foreground" />
-              <p className="text-base font-medium mb-1">No servers yet</p>
-              <p className="text-sm text-muted-foreground mb-4">Create your first server to get started</p>
-              <Button onClick={onAddInstance}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Server
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-card/50 py-12">
+            <Server className="h-10 w-10 mb-3 text-muted-foreground/50" />
+            <p className="text-sm font-medium mb-1">No servers yet</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Create your first server to get started
+            </p>
+            <Button size="sm" onClick={onAddInstance}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add Server
+            </Button>
+          </div>
         ) : (
-          <Card>
+          <div className="rounded-lg border bg-card overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Path</TableHead>
-                  <TableHead className="hidden lg:table-cell">Players</TableHead>
-                  <TableHead className="hidden lg:table-cell">Uptime</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="h-9 px-3 text-xs">Server</TableHead>
+                  <TableHead className="h-9 px-3 text-xs">Status</TableHead>
+                  <TableHead className="h-9 px-3 text-xs hidden md:table-cell">Path</TableHead>
+                  <TableHead className="h-9 px-3 text-xs hidden lg:table-cell">Memory</TableHead>
+                  <TableHead className="h-9 px-3 text-xs hidden lg:table-cell">Uptime</TableHead>
+                  <TableHead className="h-9 px-3 text-xs text-right w-[70px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {instances.map((instance) => (
-                  <TableRow
-                    key={instance.id}
-                    className="cursor-pointer"
-                    onClick={() => onSelectInstance(instance)}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-                          <Server className="h-4 w-4 text-muted-foreground" />
+                {instances.map((instance) => {
+                  const status = getStatus(instance.id);
+                  const isRunning = status === "running";
+                  const isLoading =
+                    loadingAction === instance.id ||
+                    status === "starting" ||
+                    status === "stopping";
+                  const metrics = serverMetrics.get(instance.id);
+
+                  return (
+                    <TableRow
+                      key={instance.id}
+                      className="cursor-pointer"
+                      onClick={() => onSelectInstance(instance)}
+                    >
+                      <TableCell className="py-2 px-3">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`flex h-7 w-7 items-center justify-center rounded-md ${
+                              isRunning ? "bg-green-500/10" : "bg-muted"
+                            }`}
+                          >
+                            <Server
+                              className={`h-3.5 w-3.5 ${
+                                isRunning ? "text-green-500" : "text-muted-foreground"
+                              }`}
+                            />
+                          </div>
+                          <span className="text-sm font-medium">{instance.name}</span>
                         </div>
-                        <span className="font-medium">{instance.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">Stopped</Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <span className="text-muted-foreground font-mono text-xs truncate block max-w-[250px]">
-                        {instance.path}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className="text-muted-foreground">-</span>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className="text-muted-foreground">-</span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // TODO: Start server
-                        }}
-                      >
-                        <Play className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell className="py-2 px-3">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              isRunning ? "bg-green-500" : "bg-muted-foreground/40"
+                            }`}
+                          />
+                          <span className={`text-xs ${isRunning ? "text-green-500" : "text-muted-foreground"}`}>
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2 px-3 hidden md:table-cell">
+                        <span className="text-muted-foreground font-mono text-[11px] truncate block max-w-[200px]">
+                          {instance.path}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2 px-3 hidden lg:table-cell">
+                        <span className="text-xs text-muted-foreground">
+                          {metrics?.memory_mb
+                            ? formatMemory(metrics.memory_mb)
+                            : "-"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2 px-3 hidden lg:table-cell">
+                        <span className="text-xs text-muted-foreground">
+                          {metrics?.uptime_seconds
+                            ? formatUptime(metrics.uptime_seconds)
+                            : "-"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2 px-3 text-right">
+                        {isLoading ? (
+                          <Button size="icon" variant="ghost" className="h-7 w-7" disabled>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          </Button>
+                        ) : isRunning ? (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => handleStop(e, instance)}
+                          >
+                            <Square className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:text-green-500"
+                            onClick={(e) => handleStart(e, instance)}
+                          >
+                            <Play className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
-          </Card>
+          </div>
         )}
       </div>
     </div>

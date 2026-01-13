@@ -1,6 +1,7 @@
 mod commands;
 mod database;
 
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 use commands::{
@@ -9,6 +10,13 @@ use commands::{
     delete_server_instance, download_server_files, get_downloader_info, get_downloader_version,
     get_server_instance, get_server_instances, get_system_paths, install_downloader_cli,
     is_onboarding_complete, update_server_instance, validate_server_files,
+    // Server management
+    start_server, stop_server, get_server_status, get_all_server_statuses, send_server_command,
+    ServerState,
+    // Logs
+    list_log_files, read_log_file, tail_log_file,
+    // Metrics
+    get_server_metrics, get_all_server_metrics, get_system_metrics, MetricsState,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -18,6 +26,15 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // Initialize server state
+            handle.manage(Arc::new(Mutex::new(ServerState::new())));
+            println!("[app] Server state initialized");
+
+            // Initialize metrics state (cached sysinfo instance)
+            handle.manage(Arc::new(Mutex::new(MetricsState::new())));
+            println!("[app] Metrics state initialized");
+
             tauri::async_runtime::block_on(async move {
                 match database::init_db(&handle).await {
                     Ok(pool) => {
@@ -55,7 +72,21 @@ pub fn run() {
             update_server_instance,
             // Onboarding
             is_onboarding_complete,
-            complete_onboarding
+            complete_onboarding,
+            // Server management
+            start_server,
+            stop_server,
+            get_server_status,
+            get_all_server_statuses,
+            send_server_command,
+            // Logs
+            list_log_files,
+            read_log_file,
+            tail_log_file,
+            // Metrics
+            get_server_metrics,
+            get_all_server_metrics,
+            get_system_metrics
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

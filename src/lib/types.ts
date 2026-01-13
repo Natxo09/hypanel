@@ -109,3 +109,85 @@ export interface DeleteResult {
   success: boolean;
   error: string | null;
 }
+
+// Server management types
+export type ServerStatus = "stopped" | "starting" | "running" | "stopping";
+
+export interface ServerStatusInfo {
+  status: ServerStatus;
+  instance_id: string;
+  pid: number | null;
+  started_at: string | null;
+}
+
+export interface ServerOutput {
+  instance_id: string;
+  line: string;
+  stream: "stdout" | "stderr";
+  timestamp: string;
+}
+
+export interface StartResult {
+  success: boolean;
+  pid: number | null;
+  error: string | null;
+}
+
+export interface StopResult {
+  success: boolean;
+  error: string | null;
+}
+
+export interface AuthEvent {
+  instance_id: string;
+  auth_url: string;
+  code: string;
+}
+
+// Metrics types
+export interface ServerMetrics {
+  instance_id: string;
+  pid: number | null;
+  cpu_usage: number | null;
+  memory_mb: number | null;
+  memory_percent: number | null;
+  uptime_seconds: number | null;
+  status: string;
+}
+
+export interface SystemMetrics {
+  total_memory_mb: number;
+  used_memory_mb: number;
+  available_memory_mb: number;
+  cpu_count: number;
+  cpu_usage: number;
+}
+
+// Logs types
+export interface LogFile {
+  name: string;
+  path: string;
+  size: number;
+  modified: string | null;
+}
+
+export interface LogLine {
+  line_number: number;
+  content: string;
+  level: string | null;
+  timestamp: string | null;
+}
+
+export interface LogReadResult {
+  success: boolean;
+  lines: LogLine[];
+  total_lines: number;
+  file_size: number;
+  error: string | null;
+}
+
+export interface LogFilesResult {
+  success: boolean;
+  files: LogFile[];
+  error: string | null;
+}
