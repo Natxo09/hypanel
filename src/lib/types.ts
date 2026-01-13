@@ -80,3 +80,32 @@ export interface ServerFilesStatus {
   has_assets: boolean;
   server_path: string | null;
 }
+
+// Instance types (database)
+export interface Instance {
+  id: string;
+  name: string;
+  path: string;
+  java_path: string | null;
+  jvm_args: string | null;
+  server_args: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InstanceResult {
+  success: boolean;
+  instance: Instance | null;
+  error: string | null;
+}
+
+export interface InstancesListResult {
+  success: boolean;
+  instances: Instance[];
+  error: string | null;
+}
+
+export interface DeleteResult {
+  success: boolean;
+  error: string | null;
+}

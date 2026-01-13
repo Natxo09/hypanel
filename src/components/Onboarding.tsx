@@ -24,7 +24,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { JavaInfo, SystemPaths, FileSourceType, CopyResult, DownloaderInfo, DownloadProgress, DownloadResult, InstallCliResult, ServerFilesStatus } from "@/lib/types";
+import { Input } from "@/components/ui/input";
+import type { JavaInfo, SystemPaths, FileSourceType, CopyResult, DownloaderInfo, DownloadProgress, DownloadResult, InstallCliResult, ServerFilesStatus, InstanceResult } from "@/lib/types";
 
 function StatusIcon({ ok, loading }: { ok: boolean; loading?: boolean }) {
   if (loading) {
@@ -85,6 +86,10 @@ export function Onboarding() {
   // Existing server files detection
   const [serverFilesStatus, setServerFilesStatus] = useState<ServerFilesStatus | null>(null);
   const [checkingFiles, setCheckingFiles] = useState(false);
+
+  // Instance name for saving
+  const [instanceName, setInstanceName] = useState("My Server");
+  const [savingInstance, setSavingInstance] = useState(false);
 
   // Check system on mount
   useEffect(() => {
@@ -230,6 +235,38 @@ export function Onboarding() {
     } finally {
       setInstallingCli(false);
       unlisten();
+    }
+  }
+
+  async function finishOnboarding() {
+    if (!destinationPath || !instanceName.trim()) return;
+
+    setSavingInstance(true);
+
+    try {
+      // Save instance to database
+      const result = await invoke<InstanceResult>("create_server_instance", {
+        name: instanceName.trim(),
+        path: destinationPath,
+        javaPath: java?.java_path || null,
+      });
+
+      if (!result.success) {
+        console.error("Failed to create instance:", result.error);
+        // Still continue - the files are there, just DB save failed
+      }
+
+      // Mark onboarding as complete
+      await invoke<boolean>("complete_onboarding");
+
+      // Reload the page to go to main app
+      window.location.reload();
+    } catch (err) {
+      console.error("Error finishing onboarding:", err);
+      // Still reload - files are downloaded, that's the important part
+      window.location.reload();
+    } finally {
+      setSavingInstance(false);
     }
   }
 
@@ -453,6 +490,22 @@ export function Onboarding() {
                   </Button>
                 </div>
               </div>
+
+              {/* Instance name input */}
+              {destinationPath && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Server Name</label>
+                  <Input
+                    value={instanceName}
+                    onChange={(e) => setInstanceName(e.target.value)}
+                    placeholder="My Server"
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This name is only used in HyPanel to identify your server
+                  </p>
+                </div>
+              )}
 
               {/* Server files already exist indicator */}
               {serverFilesStatus?.exists && (
@@ -690,9 +743,22 @@ export function Onboarding() {
                 Back
               </Button>
               {canProceedFromStep3 && (
-                <Button className="flex-1">
-                  Finish Setup
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                <Button
+                  className="flex-1"
+                  onClick={finishOnboarding}
+                  disabled={savingInstance || !instanceName.trim()}
+                >
+                  {savingInstance ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      Finish Setup
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
                 </Button>
               )}
             </CardFooter>
