@@ -10,7 +10,7 @@ build/
 *.local
 
 # Tauri build outputs
-src-tauri/target/
+src-tauri/target*/
 src-tauri/WixTools/
 src-tauri/gen/
 
