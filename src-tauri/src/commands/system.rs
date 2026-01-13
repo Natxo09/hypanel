@@ -24,33 +24,66 @@ pub struct SystemPaths {
 /// Detects Java installation and validates it's Java 25+
 /// First checks PATH, then scans common installation directories
 #[tauri::command]
-pub fn check_java() -> JavaInfo {
-    // First, try the default java in PATH
-    if let Some(info) = check_java_executable("java") {
-        if info.is_valid {
+pub async fn check_java() -> JavaInfo {
+    println!("[check_java] Starting Java check...");
+
+    // Run the blocking operations in a separate thread
+    let result = tokio::task::spawn_blocking(|| {
+        println!("[check_java] Checking default java in PATH...");
+
+        // First, try the default java in PATH
+        if let Some(info) = check_java_executable("java") {
+            println!("[check_java] Found java in PATH, version: {:?}, valid: {}", info.version, info.is_valid);
+            if info.is_valid {
+                return info;
+            }
+        }
+
+        println!("[check_java] Scanning for Java 25+ installations...");
+
+        // If default java is not 25+, scan for Java 25+ installations
+        if let Some(info) = find_java_25_installation() {
+            println!("[check_java] Found Java 25+ at: {:?}", info.java_path);
             return info;
         }
-    }
 
-    // If default java is not 25+, scan for Java 25+ installations
-    if let Some(info) = find_java_25_installation() {
-        return info;
-    }
+        // Fall back to reporting whatever java is in PATH (even if < 25)
+        if let Some(info) = check_java_executable("java") {
+            println!("[check_java] Falling back to PATH java");
+            return info;
+        }
 
-    // Fall back to reporting whatever java is in PATH (even if < 25)
-    if let Some(info) = check_java_executable("java") {
-        return info;
-    }
+        println!("[check_java] No Java found");
 
-    // No Java found at all
-    JavaInfo {
-        installed: false,
-        version: None,
-        major_version: None,
-        vendor: None,
-        is_valid: false,
-        java_path: None,
-        error: Some("Java not found. Please install Java 25 or higher.".to_string()),
+        // No Java found at all
+        JavaInfo {
+            installed: false,
+            version: None,
+            major_version: None,
+            vendor: None,
+            is_valid: false,
+            java_path: None,
+            error: Some("Java not found. Please install Java 25 or higher.".to_string()),
+        }
+    }).await;
+
+    match result {
+        Ok(info) => {
+            println!("[check_java] Done. Valid: {}", info.is_valid);
+            info
+        }
+        Err(e) => {
+            println!("[check_java] Error: {}", e);
+            JavaInfo {
+                installed: false,
+                version: None,
+                major_version: None,
+                vendor: None,
+                is_valid: false,
+                java_path: None,
+                error: Some(format!("Failed to check Java: {}", e)),
+            }
+        }
     }
 }
 

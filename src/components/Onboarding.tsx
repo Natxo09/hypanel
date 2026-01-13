@@ -24,7 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { JavaInfo, SystemPaths, FileSourceType, CopyResult, DownloaderInfo, DownloadProgress, DownloadResult } from "@/lib/types";
+import type { JavaInfo, SystemPaths, FileSourceType, CopyResult, DownloaderInfo, DownloadProgress, DownloadResult, InstallCliResult, ServerFilesStatus } from "@/lib/types";
 
 function StatusIcon({ ok, loading }: { ok: boolean; loading?: boolean }) {
   if (loading) {
@@ -78,6 +78,14 @@ export function Onboarding() {
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [downloadResult, setDownloadResult] = useState<DownloadResult | null>(null);
 
+  // CLI installation state
+  const [installingCli, setInstallingCli] = useState(false);
+  const [cliInstallProgress, setCliInstallProgress] = useState<DownloadProgress | null>(null);
+
+  // Existing server files detection
+  const [serverFilesStatus, setServerFilesStatus] = useState<ServerFilesStatus | null>(null);
+  const [checkingFiles, setCheckingFiles] = useState(false);
+
   // Check system on mount
   useEffect(() => {
     checkSystem();
@@ -112,7 +120,35 @@ export function Onboarding() {
     });
 
     if (selected) {
-      setDestinationPath(selected as string);
+      const path = selected as string;
+      setDestinationPath(path);
+      setServerFilesStatus(null);
+      setCheckingFiles(true);
+
+      // Check if server files already exist in the selected folder
+      try {
+        const status = await invoke<ServerFilesStatus>("check_server_files", { path });
+        setServerFilesStatus(status);
+
+        // If files already exist, automatically set success state
+        if (status.exists) {
+          setDownloadResult({
+            success: true,
+            output_path: path,
+            error: null,
+          });
+          setCopyResult({
+            success: true,
+            files_copied: 0,
+            destination: path,
+            error: null,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to check server files:", err);
+      } finally {
+        setCheckingFiles(false);
+      }
     }
   }
 
@@ -169,9 +205,37 @@ export function Onboarding() {
     }
   }
 
+  async function installCli() {
+    setInstallingCli(true);
+    setCliInstallProgress(null);
+
+    // Listen for progress events
+    const unlisten = await listen<DownloadProgress>("cli-install-progress", (event) => {
+      setCliInstallProgress(event.payload);
+    });
+
+    try {
+      const result = await invoke<InstallCliResult>("install_downloader_cli");
+      if (result.success) {
+        // Refresh downloader info after installation
+        const downloaderInfo = await invoke<DownloaderInfo>("get_downloader_info");
+        setDownloader(downloaderInfo);
+      }
+    } catch (err) {
+      setCliInstallProgress({
+        status: "error",
+        percentage: null,
+        message: err instanceof Error ? err.message : "Installation failed",
+      });
+    } finally {
+      setInstallingCli(false);
+      unlisten();
+    }
+  }
+
   const canProceedFromStep1 = java?.is_valid;
   const canProceedFromStep2 = selectedSource !== null;
-  const canProceedFromStep3 = copyResult?.success || downloadResult?.success || false;
+  const canProceedFromStep3 = copyResult?.success || downloadResult?.success || serverFilesStatus?.exists || false;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-8">
@@ -288,8 +352,8 @@ export function Onboarding() {
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <Copy className="w-5 h-5 mt-0.5 text-muted-foreground" />
-                  <div className="flex-1">
+                  <Copy className="w-5 h-5 mt-0.5 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">Copy from Hytale Launcher</p>
                       {paths?.exists && <Badge variant="secondary">Detected</Badge>}
@@ -305,9 +369,7 @@ export function Onboarding() {
                       </p>
                     )}
                   </div>
-                  {selectedSource === "launcher" && (
-                    <CheckCircle2 className="w-5 h-5 text-primary" />
-                  )}
+                  <CheckCircle2 className={`w-5 h-5 shrink-0 ${selectedSource === "launcher" ? "text-primary" : "text-transparent"}`} />
                 </div>
               </button>
 
@@ -321,8 +383,8 @@ export function Onboarding() {
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <Download className="w-5 h-5 mt-0.5 text-muted-foreground" />
-                  <div className="flex-1">
+                  <Download className="w-5 h-5 mt-0.5 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">Download with hytale-downloader</p>
                       {downloader?.available && (
@@ -335,21 +397,12 @@ export function Onboarding() {
                         : "Download server files (requires hytale-downloader CLI)"}
                     </p>
                     {!downloader?.available && (
-                      <Button variant="link" className="h-auto p-0 mt-2" asChild>
-                        <a
-                          href="https://downloader.hytale.com/hytale-downloader.zip"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Get hytale-downloader
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </a>
-                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Will be installed automatically in the next step
+                      </p>
                     )}
                   </div>
-                  {selectedSource === "download" && (
-                    <CheckCircle2 className="w-5 h-5 text-primary" />
-                  )}
+                  <CheckCircle2 className={`w-5 h-5 shrink-0 ${selectedSource === "download" ? "text-primary" : "text-transparent"}`} />
                 </div>
               </button>
             </CardContent>
@@ -391,14 +444,35 @@ export function Onboarding() {
                   <div className="flex-1 p-3 rounded-lg border bg-muted/50 text-sm truncate">
                     {destinationPath || "No folder selected"}
                   </div>
-                  <Button variant="outline" onClick={selectDestination}>
-                    <FolderOpen className="w-4 h-4" />
+                  <Button variant="outline" onClick={selectDestination} disabled={checkingFiles}>
+                    {checkingFiles ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <FolderOpen className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>
 
-              {/* Copy/Download action */}
-              {selectedSource === "launcher" && destinationPath && (
+              {/* Server files already exist indicator */}
+              {serverFilesStatus?.exists && (
+                <div className="p-4 rounded-lg border bg-green-500/10 border-green-500/20">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <div>
+                      <p className="font-medium">Server files detected</p>
+                      <p className="text-sm text-muted-foreground">
+                        {serverFilesStatus.has_server_jar && "HytaleServer.jar found"}
+                        {serverFilesStatus.has_server_jar && serverFilesStatus.has_assets && " • "}
+                        {serverFilesStatus.has_assets && "Assets.zip found"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Copy/Download action - only show if files don't already exist */}
+              {selectedSource === "launcher" && destinationPath && !serverFilesStatus?.exists && (
                 <div className="space-y-3">
                   {!copyResult && (
                     <Button
@@ -448,7 +522,7 @@ export function Onboarding() {
                 </div>
               )}
 
-              {selectedSource === "download" && destinationPath && (
+              {selectedSource === "download" && destinationPath && !serverFilesStatus?.exists && (
                 <div className="space-y-3">
                   {downloader?.available ? (
                     <>
@@ -500,9 +574,26 @@ export function Onboarding() {
                               />
                             </div>
                           )}
-                          <p className="text-xs text-muted-foreground truncate">
-                            {downloadProgress.message}
-                          </p>
+                          {/* Auth URL link */}
+                          {downloadProgress.message.startsWith("AUTH_URL:") ? (
+                            <div className="space-y-2">
+                              <p className="text-sm">Click to authenticate with your Hytale account:</p>
+                              <Button variant="outline" size="sm" className="w-full" asChild>
+                                <a
+                                  href={downloadProgress.message.replace("AUTH_URL:", "")}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Open Authentication Page
+                                  <ExternalLink className="w-3 h-3 ml-2" />
+                                </a>
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {downloadProgress.message}
+                            </p>
+                          )}
                         </div>
                       )}
 
@@ -534,23 +625,59 @@ export function Onboarding() {
                       )}
                     </>
                   ) : (
-                    <div className="p-4 rounded-lg border bg-amber-500/10 border-amber-500/20">
-                      <p className="text-sm">
-                        <strong>hytale-downloader</strong> CLI not found in PATH.
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Install it from the official repository and try again.
-                      </p>
-                      <Button variant="outline" size="sm" className="mt-3" asChild>
-                        <a
-                          href="https://downloader.hytale.com/hytale-downloader.zip"
-                          target="_blank"
-                          rel="noopener noreferrer"
+                    <div className="p-4 rounded-lg border bg-muted/50 space-y-3">
+                      <div>
+                        <p className="text-sm font-medium">
+                          hytale-downloader CLI required
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Click below to automatically download and install the CLI tool.
+                        </p>
+                      </div>
+
+                      {/* Install button */}
+                      {!cliInstallProgress && (
+                        <Button
+                          onClick={installCli}
+                          disabled={installingCli}
+                          className="w-full"
                         >
-                          Get hytale-downloader
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </a>
-                      </Button>
+                          {installingCli ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                              Installing...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-2" />
+                              Install hytale-downloader
+                            </>
+                          )}
+                        </Button>
+                      )}
+
+                      {/* Installation progress */}
+                      {cliInstallProgress && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="capitalize">{cliInstallProgress.status}</span>
+                            {cliInstallProgress.percentage !== null && (
+                              <span>{cliInstallProgress.percentage.toFixed(1)}%</span>
+                            )}
+                          </div>
+                          {cliInstallProgress.percentage !== null && (
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary transition-all duration-300"
+                                style={{ width: `${cliInstallProgress.percentage}%` }}
+                              />
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground truncate">
+                            {cliInstallProgress.message}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

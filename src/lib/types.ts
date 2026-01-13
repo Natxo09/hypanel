@@ -67,3 +67,16 @@ export interface DownloadResult {
   output_path: string | null;
   error: string | null;
 }
+
+export interface InstallCliResult {
+  success: boolean;
+  path: string | null;
+  error: string | null;
+}
+
+export interface ServerFilesStatus {
+  exists: boolean;
+  has_server_jar: boolean;
+  has_assets: boolean;
+  server_path: string | null;
+}
