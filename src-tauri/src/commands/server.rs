@@ -826,7 +826,7 @@ fn parse_auth_event(instance_id: &str, line: &str) -> Option<AuthEvent> {
     if clean_line.contains("Enter code:") {
         if let Some(code_start) = clean_line.find("Enter code:") {
             let after_code = &clean_line[code_start + 11..];
-            let code = after_code.trim().split_whitespace().next()?;
+            let code = after_code.split_whitespace().next()?;
             // Use the correct OAuth URL
             let auth_url = format!("https://oauth.accounts.hytale.com/oauth2/device/verify?user_code={}", code);
             return Some(AuthEvent {

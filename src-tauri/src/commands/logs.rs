@@ -127,7 +127,7 @@ pub fn read_log_file(
 
     let file_size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
 
-    let file = match File::open(&path) {
+    let file = match File::open(path) {
         Ok(f) => f,
         Err(e) => {
             return LogReadResult {
@@ -141,7 +141,7 @@ pub fn read_log_file(
     };
 
     let reader = BufReader::new(file);
-    let all_lines: Vec<String> = reader.lines().filter_map(Result::ok).collect();
+    let all_lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
     let total_lines = all_lines.len();
 
     // Apply offset and limit
@@ -213,7 +213,7 @@ pub fn tail_log_file(
         };
     }
 
-    let mut file = match File::open(&path) {
+    let mut file = match File::open(path) {
         Ok(f) => f,
         Err(e) => {
             return LogReadResult {
@@ -240,7 +240,7 @@ pub fn tail_log_file(
     let reader = BufReader::new(file);
     let new_lines: Vec<LogLine> = reader
         .lines()
-        .filter_map(Result::ok)
+        .map_while(Result::ok)
         .enumerate()
         .map(|(i, line)| parse_log_line(i + 1, &line))
         .collect();

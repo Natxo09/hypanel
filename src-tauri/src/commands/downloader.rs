@@ -313,7 +313,7 @@ pub async fn install_downloader_cli(app: AppHandle) -> InstallCliResult {
         };
 
         // Only emit every 10%
-        if (percentage as u32) % 10 == 0 {
+        if (percentage as u32).is_multiple_of(10) {
             let _ = app.emit(
                 "cli-install-progress",
                 DownloadProgress {

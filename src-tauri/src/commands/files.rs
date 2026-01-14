@@ -34,7 +34,7 @@ pub fn copy_server_files(source: String, destination: String) -> CopyResult {
     }
 
     // Create destination if it doesn't exist
-    if let Err(e) = fs::create_dir_all(&dest_path) {
+    if let Err(e) = fs::create_dir_all(dest_path) {
         return CopyResult {
             success: false,
             files_copied: 0,

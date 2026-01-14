@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "windows")]
 use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,7 +135,7 @@ pub async fn get_firewall_info(port: u16, server_name: String) -> Result<Firewal
     #[cfg(target_os = "windows")]
     {
         let firewall_enabled = check_windows_firewall_enabled();
-        let rule_exists = check_windows_rule_exists(&rule_name);
+        let rule_exists = check_windows_rule_exists(&_rule_name);
 
         Ok(FirewallInfo {
             os: os.to_string(),
@@ -231,13 +232,13 @@ pub async fn get_firewall_info(port: u16, server_name: String) -> Result<Firewal
 
 /// Add firewall rule (requires elevated permissions on Windows)
 #[tauri::command]
-pub async fn add_firewall_rule(port: u16, server_name: String) -> Result<FirewallResult, ()> {
-    let rule_name = format!("HyPanel - {}", server_name);
+pub async fn add_firewall_rule(_port: u16, server_name: String) -> Result<FirewallResult, ()> {
+    let _rule_name = format!("HyPanel - {}", server_name);
 
     #[cfg(target_os = "windows")]
     {
         // Check if rule already exists
-        if check_windows_rule_exists(&rule_name) {
+        if check_windows_rule_exists(&_rule_name) {
             return Ok(FirewallResult {
                 success: true,
                 message: "Firewall rule already exists".to_string(),
@@ -248,7 +249,7 @@ pub async fn add_firewall_rule(port: u16, server_name: String) -> Result<Firewal
         // Write script to a temp file to avoid argument escaping issues
         let script = format!(
             "$ruleName = '{}'; New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Protocol UDP -LocalPort {} -Action Allow",
-            rule_name.replace("'", "''"), port
+            _rule_name.replace("'", "''"), _port
         );
 
         let temp_dir = std::env::temp_dir();
@@ -280,10 +281,10 @@ pub async fn add_firewall_rule(port: u16, server_name: String) -> Result<Firewal
                 std::thread::sleep(std::time::Duration::from_millis(500));
 
                 // Verify the rule was created
-                if check_windows_rule_exists(&rule_name) {
+                if check_windows_rule_exists(&_rule_name) {
                     Ok(FirewallResult {
                         success: true,
-                        message: format!("Firewall rule created for UDP port {}", port),
+                        message: format!("Firewall rule created for UDP port {}", _port),
                         error: None,
                     })
                 } else {
@@ -335,11 +336,11 @@ pub async fn add_firewall_rule(port: u16, server_name: String) -> Result<Firewal
 /// Remove firewall rule
 #[tauri::command]
 pub async fn remove_firewall_rule(server_name: String) -> Result<FirewallResult, ()> {
-    let rule_name = format!("HyPanel - {}", server_name);
+    let _rule_name = format!("HyPanel - {}", server_name);
 
     #[cfg(target_os = "windows")]
     {
-        if !check_windows_rule_exists(&rule_name) {
+        if !check_windows_rule_exists(&_rule_name) {
             return Ok(FirewallResult {
                 success: true,
                 message: "Firewall rule does not exist".to_string(),
@@ -347,7 +348,7 @@ pub async fn remove_firewall_rule(server_name: String) -> Result<FirewallResult,
             });
         }
 
-        let script = format!("Remove-NetFirewallRule -DisplayName '{}'", rule_name);
+        let script = format!("Remove-NetFirewallRule -DisplayName '{}'", _rule_name);
 
         let output = Command::new("powershell")
             .args([
@@ -361,10 +362,10 @@ pub async fn remove_firewall_rule(server_name: String) -> Result<FirewallResult,
             Ok(_) => {
                 std::thread::sleep(std::time::Duration::from_millis(500));
 
-                if !check_windows_rule_exists(&rule_name) {
+                if !check_windows_rule_exists(&_rule_name) {
                     Ok(FirewallResult {
                         success: true,
-                        message: format!("Firewall rule '{}' removed successfully", rule_name),
+                        message: format!("Firewall rule '{}' removed successfully", _rule_name),
                         error: None,
                     })
                 } else {
