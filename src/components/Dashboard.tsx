@@ -9,6 +9,7 @@ import { ServersView } from "@/components/views/ServersView";
 import { ServerDetailView } from "@/components/views/ServerDetailView";
 import { BackupsView } from "@/components/views/BackupsView";
 import { SettingsView } from "@/components/views/SettingsView";
+import { CreateServerDialog } from "@/components/CreateServerDialog";
 import type { Instance, InstancesListResult, ServerStatusInfo } from "@/lib/types";
 
 export function Dashboard() {
@@ -18,6 +19,7 @@ export function Dashboard() {
   const [currentView, setCurrentView] = useState<View>("home");
   const [selectedInstance, setSelectedInstance] = useState<Instance | null>(null);
   const [serverStatuses, setServerStatuses] = useState<Map<string, string>>(new Map());
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   // Load instances
   useEffect(() => {
@@ -86,8 +88,14 @@ export function Dashboard() {
   }
 
   function handleAddInstance() {
-    // TODO: Open add instance dialog
-    console.log("Add instance");
+    setCreateDialogOpen(true);
+  }
+
+  function handleServerCreated(newInstance: Instance) {
+    setInstances((prev) => [...prev, newInstance]);
+    // Optionally navigate to the new server
+    setSelectedInstance(newInstance);
+    setCurrentView("server");
   }
 
   if (loading) {
@@ -146,6 +154,13 @@ export function Dashboard() {
           {currentView === "settings" && <SettingsView />}
         </div>
       </div>
+
+      <CreateServerDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        instances={instances}
+        onServerCreated={handleServerCreated}
+      />
     </div>
   );
 }
