@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Settings, Network, ArrowUpCircle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { ServerArgsSection, type ServerArgsSettings, type UsedPort } from "./Ser
 import { CommandPreview } from "./CommandPreview";
 import { NetworkSection } from "./NetworkSection";
 import { AuthSection } from "./AuthSection";
+import { UpdatesSection } from "./UpdatesSection";
 import type { Instance, SystemMetrics } from "@/lib/types";
 
 // Helper to extract port from server_args string
@@ -44,6 +45,7 @@ interface SettingsTabProps {
   onFormChange: (updates: Partial<SettingsFormState>) => void;
   onSave: () => void;
   onRefreshInstance?: () => void;
+  onVersionUpdated?: (newVersion: string) => void;
 }
 
 // Parse JVM args string to structured format
@@ -209,6 +211,8 @@ function buildServerArgsString(settings: ServerArgsSettings): string {
   return parts.join(" ");
 }
 
+type SubTab = "general" | "network" | "updates" | "info";
+
 export function SettingsTab({
   instance,
   settingsForm,
@@ -219,8 +223,25 @@ export function SettingsTab({
   onFormChange,
   onSave,
   onRefreshInstance,
+  onVersionUpdated,
 }: SettingsTabProps) {
+  const [activeSubTab, setActiveSubTab] = useState<SubTab>("general");
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Detect if there are unsaved changes
+  const hasChanges = useMemo(() => {
+    const originalName = instance.name;
+    const originalJavaPath = instance.java_path || "";
+    const originalJvmArgs = instance.jvm_args || "";
+    const originalServerArgs = instance.server_args || "";
+
+    return (
+      settingsForm.name !== originalName ||
+      settingsForm.java_path !== originalJavaPath ||
+      settingsForm.jvm_args !== originalJvmArgs ||
+      settingsForm.server_args !== originalServerArgs
+    );
+  }, [settingsForm, instance]);
 
   // Calculate ports used by OTHER instances (not this one)
   const usedPorts: UsedPort[] = useMemo(() => {
@@ -281,152 +302,232 @@ export function SettingsTab({
     onFormChange({ server_args: buildServerArgsString(newSettings) });
   };
 
+  const subTabs: { id: SubTab; label: string; icon: React.ReactNode }[] = [
+    { id: "general", label: "General", icon: <Settings className="h-3.5 w-3.5" /> },
+    { id: "network", label: "Network", icon: <Network className="h-3.5 w-3.5" /> },
+    { id: "updates", label: "Updates", icon: <ArrowUpCircle className="h-3.5 w-3.5" /> },
+    { id: "info", label: "Info", icon: <Info className="h-3.5 w-3.5" /> },
+  ];
+
   return (
-    <div className="max-w-2xl space-y-4">
-      {/* Basic Settings */}
-      <div className="rounded-lg border bg-card p-4 space-y-4">
-        <h3 className="text-sm font-medium">General</h3>
-
-        <div className="space-y-2">
-          <Label htmlFor="name">Server Name</Label>
-          <Input
-            id="name"
-            value={settingsForm.name}
-            onChange={(e) => onFormChange({ name: e.target.value })}
-          />
+    <div className="space-y-4 pb-16">
+      {/* Floating save bar - appears when there are changes */}
+      {hasChanges && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2.5 shadow-lg">
+            <span className="text-sm text-muted-foreground">You have unsaved changes</span>
+            <Button onClick={onSave} disabled={isSaving} size="sm">
+              {isSaving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              Save Changes
+            </Button>
+          </div>
         </div>
+      )}
 
-        <div className="space-y-2">
-          <Label htmlFor="java_path">Java Path</Label>
-          <Input
-            id="java_path"
-            value={settingsForm.java_path}
-            onChange={(e) => onFormChange({ java_path: e.target.value })}
-            placeholder="java (uses system default)"
-            className="font-mono text-sm"
-          />
-          <p className="text-xs text-muted-foreground">
-            Path to Java 25+ executable. Leave empty to use system default.
-          </p>
-        </div>
+      {/* Sub-tabs navigation - underline style */}
+      <div className="border-b">
+        <nav className="flex gap-4" aria-label="Settings sections">
+          {subTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id)}
+              className={`flex items-center gap-1.5 pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
+                activeSubTab === tab.id
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </nav>
       </div>
 
-      {/* JVM Memory Settings */}
-      <div className="rounded-lg border bg-card p-4">
-        <JvmSettingsSection
-          settings={jvmSettings}
-          systemMetrics={systemMetrics}
-          onChange={handleJvmChange}
-        />
-      </div>
+      {/* General Tab */}
+      {activeSubTab === "general" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left Column */}
+          <div className="space-y-4">
+            {/* Basic Settings */}
+            <div className="rounded-lg border bg-card p-4 space-y-4">
+              <h3 className="text-sm font-medium">General</h3>
 
-      {/* Server Arguments */}
-      <div className="rounded-lg border bg-card p-4">
-        <ServerArgsSection
-          settings={serverArgsSettings}
-          instancePath={instance.path}
-          usedPorts={usedPorts}
-          onChange={handleServerArgsChange}
-        />
-      </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Server Name</Label>
+                <Input
+                  id="name"
+                  value={settingsForm.name}
+                  onChange={(e) => onFormChange({ name: e.target.value })}
+                />
+              </div>
 
-      {/* Authentication */}
-      <div className="rounded-lg border bg-card p-4">
-        <AuthSection
-          instance={instance}
-          isRunning={isRunning}
-          onRefresh={onRefreshInstance}
-        />
-      </div>
-
-      {/* Network / Firewall */}
-      <div className="rounded-lg border bg-card p-4">
-        <NetworkSection
-          serverName={settingsForm.name || instance.name}
-          port={parseInt(serverArgsSettings.bindPort) || 5520}
-        />
-      </div>
-
-      {/* Command Preview */}
-      <div className="rounded-lg border bg-card p-4">
-        <CommandPreview
-          javaPath={settingsForm.java_path}
-          jvmArgs={settingsForm.jvm_args}
-          serverArgs={settingsForm.server_args}
-        />
-      </div>
-
-      {/* Advanced / Raw Mode */}
-      <div className="rounded-lg border border-dashed p-4 space-y-3">
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
-        >
-          {showAdvanced ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : (
-            <ChevronDown className="h-4 w-4" />
-          )}
-          Advanced Mode (Raw Arguments)
-        </button>
-
-        {showAdvanced && (
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="jvm_args_raw">JVM Arguments (Raw)</Label>
-              <Input
-                id="jvm_args_raw"
-                value={settingsForm.jvm_args}
-                onChange={(e) => onFormChange({ jvm_args: e.target.value })}
-                placeholder="-Xmx4G -Xms2G"
-                className="font-mono text-sm"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="java_path">Java Path</Label>
+                <Input
+                  id="java_path"
+                  value={settingsForm.java_path}
+                  onChange={(e) => onFormChange({ java_path: e.target.value })}
+                  placeholder="java (uses system default)"
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Path to Java 25+ executable. Leave empty to use system default.
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="server_args_raw">Server Arguments (Raw)</Label>
-              <Input
-                id="server_args_raw"
-                value={settingsForm.server_args}
-                onChange={(e) => onFormChange({ server_args: e.target.value })}
-                placeholder="--bind 0.0.0.0:5520"
-                className="font-mono text-sm"
+            {/* JVM Memory Settings */}
+            <div className="rounded-lg border bg-card p-4">
+              <JvmSettingsSection
+                settings={jvmSettings}
+                systemMetrics={systemMetrics}
+                onChange={handleJvmChange}
               />
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Save Button */}
-      <Button onClick={onSave} disabled={isSaving} className="w-full">
-        {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-        Save Changes
-      </Button>
+          {/* Right Column */}
+          <div className="space-y-4">
+            {/* Server Arguments */}
+            <div className="rounded-lg border bg-card p-4">
+              <ServerArgsSection
+                settings={serverArgsSettings}
+                instancePath={instance.path}
+                usedPorts={usedPorts}
+                onChange={handleServerArgsChange}
+              />
+            </div>
 
-      {/* Server Info */}
-      <div className="rounded-lg border bg-card p-4 space-y-2">
-        <h3 className="text-sm font-medium">Server Info</h3>
-        <dl className="space-y-1 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-muted-foreground">Instance ID</dt>
-            <dd className="font-mono text-xs">{instance.id}</dd>
+            {/* Command Preview */}
+            <div className="rounded-lg border bg-card p-4">
+              <CommandPreview
+                javaPath={settingsForm.java_path}
+                jvmArgs={settingsForm.jvm_args}
+                serverArgs={settingsForm.server_args}
+              />
+            </div>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-muted-foreground">Path</dt>
-            <dd className="font-mono text-xs truncate max-w-[300px]" title={instance.path}>
-              {instance.path}
-            </dd>
+        </div>
+      )}
+
+      {/* Network Tab */}
+      {activeSubTab === "network" && (
+        <div className="max-w-2xl mx-auto space-y-4">
+          {/* Network / Firewall */}
+          <div className="rounded-lg border bg-card p-4">
+            <NetworkSection
+              serverName={settingsForm.name || instance.name}
+              port={parseInt(serverArgsSettings.bindPort) || 5520}
+            />
           </div>
-          <div className="flex justify-between">
-            <dt className="text-muted-foreground">Created</dt>
-            <dd className="text-xs">
-              {instance.created_at
-                ? new Date(instance.created_at).toLocaleDateString()
-                : "-"}
-            </dd>
+        </div>
+      )}
+
+      {/* Updates Tab */}
+      {activeSubTab === "updates" && (
+        <div className="max-w-2xl mx-auto space-y-4">
+          <div className="rounded-lg border bg-card p-4">
+            <UpdatesSection
+              instance={instance}
+              isRunning={isRunning}
+              onVersionUpdated={onVersionUpdated || (() => {})}
+            />
           </div>
-        </dl>
-      </div>
+        </div>
+      )}
+
+      {/* Info Tab */}
+      {activeSubTab === "info" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left Column */}
+          <div className="space-y-4">
+            {/* Authentication */}
+            <div className="rounded-lg border bg-card p-4">
+              <AuthSection
+                instance={instance}
+                isRunning={isRunning}
+                onRefresh={onRefreshInstance}
+              />
+            </div>
+
+            {/* Server Info */}
+            <div className="rounded-lg border bg-card p-4 space-y-2">
+              <h3 className="text-sm font-medium">Server Info</h3>
+              <dl className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Instance ID</dt>
+                  <dd className="font-mono text-xs">{instance.id}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Path</dt>
+                  <dd className="font-mono text-xs truncate max-w-[300px]" title={instance.path}>
+                    {instance.path}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Installed Version</dt>
+                  <dd className="font-mono text-xs">
+                    {instance.installed_version || "unknown"}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Created</dt>
+                  <dd className="text-xs">
+                    {instance.created_at
+                      ? new Date(instance.created_at).toLocaleDateString()
+                      : "-"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-4">
+            {/* Advanced / Raw Mode */}
+            <div className="rounded-lg border border-dashed p-4 space-y-3">
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+              >
+                {showAdvanced ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+                Advanced Mode (Raw Arguments)
+              </button>
+
+              {showAdvanced && (
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="jvm_args_raw">JVM Arguments (Raw)</Label>
+                    <Input
+                      id="jvm_args_raw"
+                      value={settingsForm.jvm_args}
+                      onChange={(e) => onFormChange({ jvm_args: e.target.value })}
+                      placeholder="-Xmx4G -Xms2G"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="server_args_raw">Server Arguments (Raw)</Label>
+                    <Input
+                      id="server_args_raw"
+                      value={settingsForm.server_args}
+                      onChange={(e) => onFormChange({ server_args: e.target.value })}
+                      placeholder="--bind 0.0.0.0:5520"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -605,14 +605,19 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
         serverArgs: settingsForm.server_args || null,
       });
 
+      // Update local instance state so hasChanges becomes false
+      const updatedInstance = {
+        ...instance,
+        name: settingsForm.name,
+        java_path: settingsForm.java_path || null,
+        jvm_args: settingsForm.jvm_args || null,
+        server_args: settingsForm.server_args || null,
+      };
+      setInstance(updatedInstance);
+
+      // Notify parent component
       if (onUpdateInstance) {
-        onUpdateInstance({
-          ...instance,
-          name: settingsForm.name,
-          java_path: settingsForm.java_path || null,
-          jvm_args: settingsForm.jvm_args || null,
-          server_args: settingsForm.server_args || null,
-        });
+        onUpdateInstance(updatedInstance);
       }
     } catch (err) {
       console.error("Failed to save settings:", err);
@@ -851,6 +856,14 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
               onFormChange={(updates) => setSettingsForm((s) => ({ ...s, ...updates }))}
               onSave={handleSaveSettings}
               onRefreshInstance={reloadInstance}
+              onVersionUpdated={(newVersion) => {
+                // Update local instance state
+                setInstance((prev) => ({ ...prev, installed_version: newVersion }));
+                // Notify parent component if callback provided
+                if (onUpdateInstance) {
+                  onUpdateInstance({ ...instance, installed_version: newVersion });
+                }
+              }}
             />
           </TabsContent>
 
