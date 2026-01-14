@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -6,22 +6,22 @@ import {
   Play,
   Square,
   FolderOpen,
-  Settings,
   Terminal,
-  Send,
   ExternalLink,
+  FileText,
+  Settings,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  ConsoleTab,
+  LogsTab,
+  SettingsTab,
+  MetricsTab,
+  type ConsoleMessage,
+} from "./server-detail";
 import type {
   Instance,
   ServerStatus,
@@ -30,33 +30,49 @@ import type {
   StartResult,
   StopResult,
   AuthEvent,
+  ServerMetrics,
+  LogFile,
+  LogReadResult,
 } from "@/lib/types";
 
 interface ServerDetailViewProps {
   instance: Instance;
   onBack: () => void;
+  onUpdateInstance?: (instance: Instance) => void;
 }
 
-interface ConsoleMessage {
-  id: number;
-  text: string;
-  type: "stdout" | "stderr" | "system" | "command";
-  timestamp: string;
-}
-
-export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
+export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerDetailViewProps) {
+  // Server state
   const [status, setStatus] = useState<ServerStatus>("stopped");
+  const [, setPid] = useState<number | null>(null);
+  const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [authEvent, setAuthEvent] = useState<AuthEvent | null>(null);
+  const [activeTab, setActiveTab] = useState("console");
+
+  // Console state
   const [consoleOutput, setConsoleOutput] = useState<ConsoleMessage[]>([]);
   const [commandInput, setCommandInput] = useState("");
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [authEvent, setAuthEvent] = useState<AuthEvent | null>(null);
-  const [pid, setPid] = useState<number | null>(null);
-  const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [messageIdRef] = useState({ current: 0 });
 
-  const consoleRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const messageIdRef = useRef(0);
+  // Settings state
+  const [settingsForm, setSettingsForm] = useState({
+    name: instance.name,
+    java_path: instance.java_path || "",
+    jvm_args: instance.jvm_args || "",
+    server_args: instance.server_args || "",
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // Logs state
+  const [logFiles, setLogFiles] = useState<LogFile[]>([]);
+  const [selectedLog, setSelectedLog] = useState<string | null>(null);
+  const [logContent, setLogContent] = useState<LogReadResult | null>(null);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+
+  // Metrics state
+  const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
 
   // Add message to console
   const addConsoleMessage = useCallback((text: string, type: ConsoleMessage["type"]) => {
@@ -69,7 +85,7 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
         timestamp: new Date().toISOString(),
       },
     ]);
-  }, []);
+  }, [messageIdRef]);
 
   // Fetch initial status
   useEffect(() => {
@@ -92,7 +108,6 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
   useEffect(() => {
     const unlisteners: UnlistenFn[] = [];
 
-    // Server output
     listen<ServerOutput>("server-output", (event) => {
       if (event.payload.instance_id === instance.id) {
         addConsoleMessage(
@@ -102,7 +117,6 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
       }
     }).then((unlisten) => unlisteners.push(unlisten));
 
-    // Status changes
     listen<ServerStatusInfo>("server-status-change", (event) => {
       if (event.payload.instance_id === instance.id) {
         setStatus(event.payload.status);
@@ -118,7 +132,6 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
       }
     }).then((unlisten) => unlisteners.push(unlisten));
 
-    // Auth required
     listen<AuthEvent>("server-auth-required", (event) => {
       if (event.payload.instance_id === instance.id) {
         setAuthEvent(event.payload);
@@ -129,7 +142,6 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
       }
     }).then((unlisten) => unlisteners.push(unlisten));
 
-    // Auth success
     listen<string>("server-auth-success", (event) => {
       if (event.payload === instance.id) {
         setAuthEvent(null);
@@ -137,7 +149,6 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
       }
     }).then((unlisten) => unlisteners.push(unlisten));
 
-    // Server exit
     listen<string>("server-exit", (event) => {
       if (event.payload === instance.id) {
         addConsoleMessage("Server process exited", "system");
@@ -149,12 +160,74 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
     };
   }, [instance.id, addConsoleMessage]);
 
-  // Auto-scroll console
+  // Fetch metrics periodically when running
   useEffect(() => {
-    if (consoleRef.current) {
-      consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+    if (status !== "running") {
+      setMetrics(null);
+      return;
     }
-  }, [consoleOutput]);
+
+    async function fetchMetrics() {
+      try {
+        const m = await invoke<ServerMetrics>("get_server_metrics", {
+          instanceId: instance.id,
+        });
+        setMetrics(m);
+      } catch (err) {
+        console.error("Failed to fetch metrics:", err);
+      }
+    }
+
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 3000);
+    return () => clearInterval(interval);
+  }, [instance.id, status]);
+
+  // Fetch log files when logs tab is active
+  useEffect(() => {
+    if (activeTab !== "logs") return;
+
+    async function fetchLogFiles() {
+      setIsLoadingLogs(true);
+      try {
+        const result = await invoke<{ success: boolean; files: LogFile[]; error?: string }>(
+          "list_log_files",
+          { instancePath: instance.path }
+        );
+        if (result.success) {
+          setLogFiles(result.files);
+          if (result.files.length > 0 && !selectedLog) {
+            setSelectedLog(result.files[0].path);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch log files:", err);
+      } finally {
+        setIsLoadingLogs(false);
+      }
+    }
+
+    fetchLogFiles();
+  }, [activeTab, instance.path, selectedLog]);
+
+  // Fetch log content when selected log changes
+  useEffect(() => {
+    if (!selectedLog) return;
+
+    async function fetchLogContent() {
+      try {
+        const result = await invoke<LogReadResult>("read_log_file", {
+          filePath: selectedLog,
+          tailLines: 500,
+        });
+        setLogContent(result);
+      } catch (err) {
+        console.error("Failed to read log file:", err);
+      }
+    }
+
+    fetchLogContent();
+  }, [selectedLog]);
 
   // Start server
   async function handleStart() {
@@ -206,7 +279,6 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
     const cmd = commandInput.trim();
     addConsoleMessage(`> ${cmd}`, "command");
 
-    // Add to history
     setCommandHistory((prev) => [...prev.filter((c) => c !== cmd), cmd]);
     setHistoryIndex(-1);
     setCommandInput("");
@@ -221,15 +293,13 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
     }
   }
 
-  // Handle key navigation in command input
+  // Handle key navigation
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowUp") {
       e.preventDefault();
       if (commandHistory.length > 0) {
         const newIndex =
-          historyIndex < commandHistory.length - 1
-            ? historyIndex + 1
-            : historyIndex;
+          historyIndex < commandHistory.length - 1 ? historyIndex + 1 : historyIndex;
         setHistoryIndex(newIndex);
         setCommandInput(commandHistory[commandHistory.length - 1 - newIndex]);
       }
@@ -256,16 +326,38 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
     }
   }
 
-  // Get status badge variant
-  function getStatusVariant(): "default" | "secondary" | "destructive" {
-    switch (status) {
-      case "running":
-        return "default";
-      case "starting":
-      case "stopping":
-        return "secondary";
-      default:
-        return "secondary";
+  // Save settings
+  async function handleSaveSettings() {
+    setIsSavingSettings(true);
+    try {
+      await invoke("update_server_instance", {
+        id: instance.id,
+        name: settingsForm.name,
+        javaPath: settingsForm.java_path || null,
+        jvmArgs: settingsForm.jvm_args || null,
+        serverArgs: settingsForm.server_args || null,
+      });
+
+      if (onUpdateInstance) {
+        onUpdateInstance({
+          ...instance,
+          name: settingsForm.name,
+          java_path: settingsForm.java_path || null,
+          jvm_args: settingsForm.jvm_args || null,
+          server_args: settingsForm.server_args || null,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }
+
+  // Refresh log content
+  function handleRefreshLog() {
+    if (selectedLog) {
+      setSelectedLog(selectedLog);
     }
   }
 
@@ -283,213 +375,138 @@ export function ServerDetailView({ instance, onBack }: ServerDetailViewProps) {
     return `${hours}h ${mins}m`;
   }
 
+  const isRunning = status === "running";
+  const isLoading = status === "starting" || status === "stopping";
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader title={instance.name} backButton onBack={onBack}>
-        <Badge variant={getStatusVariant()} className="text-sm">
-          {status.charAt(0).toUpperCase() + status.slice(1)}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {isRunning && (
+            <span className="text-xs text-muted-foreground">{formatUptime()}</span>
+          )}
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                isRunning ? "bg-green-500" : isLoading ? "bg-yellow-500 animate-pulse" : "bg-muted-foreground/40"
+              }`}
+            />
+            <span className="text-sm capitalize">{status}</span>
+          </div>
+        </div>
       </PageHeader>
 
-      <div className="flex flex-1 gap-4 overflow-hidden p-4">
-        {/* Left panel */}
-        <div className="flex w-72 shrink-0 flex-col gap-4">
-          {/* Controls */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Controls</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {status === "stopped" ? (
-                <Button className="w-full" onClick={handleStart}>
-                  <Play className="h-4 w-4 mr-2" />
-                  Start Server
-                </Button>
-              ) : status === "running" ? (
-                <Button
-                  className="w-full"
-                  variant="destructive"
-                  onClick={handleStop}
-                >
-                  <Square className="h-4 w-4 mr-2" />
-                  Stop Server
-                </Button>
-              ) : (
-                <Button className="w-full" disabled>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {status === "starting" ? "Starting..." : "Stopping..."}
-                </Button>
-              )}
-              <Button className="w-full" variant="outline" onClick={handleOpenFolder}>
-                <FolderOpen className="h-4 w-4 mr-2" />
+      <div className="flex-1 overflow-hidden p-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex h-full flex-col">
+          <div className="flex items-center justify-between mb-3">
+            <TabsList>
+              <TabsTrigger value="console" className="gap-1.5">
+                <Terminal className="h-3.5 w-3.5" />
+                Console
+              </TabsTrigger>
+              <TabsTrigger value="logs" className="gap-1.5">
+                <FileText className="h-3.5 w-3.5" />
+                Logs
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="gap-1.5">
+                <Settings className="h-3.5 w-3.5" />
+                Settings
+              </TabsTrigger>
+              <TabsTrigger value="metrics" className="gap-1.5">
+                <Activity className="h-3.5 w-3.5" />
+                Metrics
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleOpenFolder}>
+                <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
                 Open Folder
               </Button>
-              <Button className="w-full" variant="outline" disabled>
-                <Settings className="h-4 w-4 mr-2" />
-                Configure
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Server Info */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Server Info</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="space-y-2 text-sm">
-                <div>
-                  <dt className="text-muted-foreground">Path</dt>
-                  <dd
-                    className="font-mono text-xs truncate"
-                    title={instance.path}
-                  >
-                    {instance.path}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Status</dt>
-                  <dd className="capitalize">{status}</dd>
-                </div>
-                {pid && (
-                  <div>
-                    <dt className="text-muted-foreground">PID</dt>
-                    <dd className="font-mono">{pid}</dd>
-                  </div>
-                )}
-                {status === "running" && (
-                  <div>
-                    <dt className="text-muted-foreground">Uptime</dt>
-                    <dd>{formatUptime()}</dd>
-                  </div>
-                )}
-              </dl>
-            </CardContent>
-          </Card>
-
-          {/* Auth Card */}
-          {authEvent && (
-            <Card className="border-yellow-500/50 bg-yellow-500/10">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base text-yellow-500">
-                  Authentication Required
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Visit the URL below and enter the code to authenticate your
-                  server.
-                </p>
-                <div className="rounded bg-background/50 p-2 font-mono text-lg text-center">
-                  {authEvent.code}
-                </div>
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  onClick={() => window.open(authEvent.auth_url, "_blank")}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open Auth Page
+              {status === "stopped" ? (
+                <Button size="sm" onClick={handleStart}>
+                  <Play className="h-3.5 w-3.5 mr-1.5" />
+                  Start
                 </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Console */}
-        <Card className="flex flex-1 flex-col min-w-0">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Terminal className="h-4 w-4" />
-              <CardTitle className="text-base">Console</CardTitle>
-            </div>
-            <CardDescription>Server output and command input</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col pb-4 min-h-0">
-            {/* Output area */}
-            <div
-              ref={consoleRef}
-              className="flex-1 rounded-lg bg-zinc-950 p-4 font-mono text-sm overflow-auto mb-3"
-            >
-              {consoleOutput.length === 0 ? (
-                <p className="text-zinc-600">
-                  {status === "stopped"
-                    ? "Server is not running. Start the server to see output."
-                    : "Waiting for output..."}
-                </p>
+              ) : isLoading ? (
+                <Button size="sm" disabled>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  {status === "starting" ? "Starting..." : "Stopping..."}
+                </Button>
               ) : (
-                consoleOutput.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`whitespace-pre-wrap break-all ${
-                      msg.type === "stderr"
-                        ? "text-red-400"
-                        : msg.type === "system"
-                        ? "text-yellow-400"
-                        : msg.type === "command"
-                        ? "text-blue-400"
-                        : "text-zinc-300"
-                    }`}
-                  >
-                    {msg.text}
-                  </div>
-                ))
+                <Button size="sm" variant="destructive" onClick={handleStop}>
+                  <Square className="h-3.5 w-3.5 mr-1.5" />
+                  Stop
+                </Button>
               )}
             </div>
+          </div>
 
-            {/* Command input */}
-            <form onSubmit={handleSendCommand} className="flex gap-2">
-              <Input
-                ref={inputRef}
-                value={commandInput}
-                onChange={(e) => setCommandInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  status === "running"
-                    ? "Type a command..."
-                    : "Start server to send commands"
-                }
-                disabled={status !== "running"}
-                className="font-mono"
-              />
-              <Button
-                type="submit"
-                size="icon"
-                disabled={status !== "running" || !commandInput.trim()}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-
-            {/* Quick commands */}
-            {status === "running" && (
-              <div className="flex gap-2 mt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => {
-                    setCommandInput("/help");
-                    inputRef.current?.focus();
-                  }}
-                >
-                  /help
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => {
-                    setCommandInput("/auth login device");
-                    inputRef.current?.focus();
-                  }}
-                >
-                  /auth login device
-                </Button>
+          {/* Auth Banner */}
+          {authEvent && (
+            <div className="mb-3 flex items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-yellow-500">Authentication required</span>
+                <code className="rounded bg-background/50 px-2 py-0.5 text-sm font-mono">
+                  {authEvent.code}
+                </code>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => window.open(authEvent.auth_url, "_blank")}
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                Open Auth Page
+              </Button>
+            </div>
+          )}
+
+          {/* Console Tab */}
+          <TabsContent value="console" className="flex-1 flex flex-col min-h-0 mt-0">
+            <ConsoleTab
+              consoleOutput={consoleOutput}
+              commandInput={commandInput}
+              isRunning={isRunning}
+              status={status}
+              onCommandChange={setCommandInput}
+              onSendCommand={handleSendCommand}
+              onKeyDown={handleKeyDown}
+            />
+          </TabsContent>
+
+          {/* Logs Tab */}
+          <TabsContent value="logs" className="flex-1 flex flex-col min-h-0 mt-0">
+            <LogsTab
+              logFiles={logFiles}
+              selectedLog={selectedLog}
+              logContent={logContent}
+              isLoading={isLoadingLogs}
+              onSelectLog={setSelectedLog}
+              onRefresh={handleRefreshLog}
+            />
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="flex-1 overflow-auto mt-0">
+            <SettingsTab
+              instance={instance}
+              settingsForm={settingsForm}
+              isSaving={isSavingSettings}
+              onFormChange={(updates) => setSettingsForm((s) => ({ ...s, ...updates }))}
+              onSave={handleSaveSettings}
+            />
+          </TabsContent>
+
+          {/* Metrics Tab */}
+          <TabsContent value="metrics" className="flex-1 overflow-auto mt-0">
+            <MetricsTab
+              isRunning={isRunning}
+              metrics={metrics}
+              uptime={formatUptime()}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
