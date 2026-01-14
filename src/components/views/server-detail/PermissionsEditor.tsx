@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { JsonEditor } from "@/components/ui/json-editor";
 import type { Permissions, PermissionsResult, JsonWriteResult } from "@/lib/types";
 
 interface PermissionsEditorProps {
@@ -271,25 +272,23 @@ export function PermissionsEditor({ instancePath, isRunning }: PermissionsEditor
       )}
 
       {rawMode ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">permissions.json</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <textarea
-              value={rawJson}
-              onChange={(e) => handleRawJsonChange(e.target.value)}
-              className="w-full h-80 p-3 font-mono text-sm bg-muted/50 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-              spellCheck={false}
-            />
-            {rawError && (
-              <p className="mt-2 text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {rawError}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">permissions.json</span>
+          </div>
+          <JsonEditor
+            value={rawJson}
+            onChange={handleRawJsonChange}
+            disabled={isRunning}
+            minHeight="450px"
+          />
+          {rawError && (
+            <p className="text-xs text-destructive flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {rawError}
+            </p>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {/* Groups */}

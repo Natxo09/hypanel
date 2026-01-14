@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { JsonEditor } from "@/components/ui/json-editor";
 import type { Ban, BansResult, JsonWriteResult } from "@/lib/types";
 
 interface BansEditorProps {
@@ -231,25 +232,23 @@ export function BansEditor({ instancePath, isRunning }: BansEditorProps) {
       )}
 
       {rawMode ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">bans.json</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <textarea
-              value={rawJson}
-              onChange={(e) => handleRawJsonChange(e.target.value)}
-              className="w-full h-64 p-3 font-mono text-sm bg-muted/50 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-              spellCheck={false}
-            />
-            {rawError && (
-              <p className="mt-2 text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {rawError}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">bans.json</span>
+          </div>
+          <JsonEditor
+            value={rawJson}
+            onChange={handleRawJsonChange}
+            disabled={isRunning}
+            minHeight="400px"
+          />
+          {rawError && (
+            <p className="text-xs text-destructive flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {rawError}
+            </p>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
           {/* Add ban form */}

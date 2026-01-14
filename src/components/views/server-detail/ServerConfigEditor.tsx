@@ -7,7 +7,6 @@ import {
   LayoutList,
   RefreshCw,
   AlertCircle,
-  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,11 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { JsonEditor } from "@/components/ui/json-editor";
 import type { ServerConfig, ServerConfigResult, JsonWriteResult } from "@/lib/types";
 
 interface ServerConfigEditorProps {
@@ -39,7 +34,6 @@ export function ServerConfigEditor({ instancePath, isRunning }: ServerConfigEdit
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Raw JSON mode
   const [rawMode, setRawMode] = useState(false);
@@ -219,25 +213,23 @@ export function ServerConfigEditor({ instancePath, isRunning }: ServerConfigEdit
       )}
 
       {rawMode ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">config.json</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <textarea
-              value={rawJson}
-              onChange={(e) => handleRawJsonChange(e.target.value)}
-              className="w-full h-96 p-3 font-mono text-sm bg-muted/50 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-              spellCheck={false}
-            />
-            {rawError && (
-              <p className="mt-2 text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {rawError}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">config.json</span>
+          </div>
+          <JsonEditor
+            value={rawJson}
+            onChange={handleRawJsonChange}
+            disabled={isRunning}
+            minHeight="500px"
+          />
+          {rawError && (
+            <p className="text-xs text-destructive flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {rawError}
+            </p>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
           {/* Basic Settings */}
@@ -358,31 +350,10 @@ export function ServerConfigEditor({ instancePath, isRunning }: ServerConfigEdit
             </CardContent>
           </Card>
 
-          {/* Advanced Settings (Collapsible) */}
-          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-            <Card>
-              <CollapsibleTrigger asChild>
-                <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">Advanced Settings</CardTitle>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
-                    />
-                  </div>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Advanced configuration options. Use Raw JSON mode for full control over all settings.
-                  </p>
-                  <div className="p-3 rounded-lg bg-muted/50 font-mono text-xs max-h-48 overflow-auto">
-                    <pre>{JSON.stringify(config, null, 2)}</pre>
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
+          {/* Tip for advanced settings */}
+          <p className="text-xs text-muted-foreground text-center py-2">
+            Use Raw JSON mode for advanced configuration options
+          </p>
         </div>
       )}
     </div>

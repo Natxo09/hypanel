@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { JsonEditor } from "@/components/ui/json-editor";
 import type { WorldConfig, WorldConfigResult, JsonWriteResult } from "@/lib/types";
 
 interface WorldConfigEditorProps {
@@ -226,25 +227,23 @@ export function WorldConfigEditor({ worldPath, isRunning }: WorldConfigEditorPro
       )}
 
       {rawMode ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">config.json</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <textarea
-              value={rawJson}
-              onChange={(e) => handleRawJsonChange(e.target.value)}
-              className="w-full h-96 p-3 font-mono text-sm bg-muted/50 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-              spellCheck={false}
-            />
-            {rawError && (
-              <p className="mt-2 text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {rawError}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">config.json</span>
+          </div>
+          <JsonEditor
+            value={rawJson}
+            onChange={handleRawJsonChange}
+            disabled={isRunning}
+            minHeight="500px"
+          />
+          {rawError && (
+            <p className="text-xs text-destructive flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {rawError}
+            </p>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
           {/* World Info (Read-only) */}

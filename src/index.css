@@ -297,3 +297,20 @@
   scrollbar-width: thin;
   scrollbar-color: oklch(0.4 0 0) transparent;
 }
+
+/* JSON Editor styles */
+.json-editor-textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+
+.json-editor-textarea textarea {
+  outline: none !important;
+  caret-color: #fff;
+}
+
+.json-editor-textarea pre {
+  -webkit-user-select: text;
+  user-select: text;
+}
