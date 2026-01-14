@@ -25,37 +25,24 @@ pub struct SystemPaths {
 /// First checks PATH, then scans common installation directories
 #[tauri::command]
 pub async fn check_java() -> JavaInfo {
-    let start = std::time::Instant::now();
-    println!("[check_java] Starting Java check...");
-
     // Run the blocking operations in a separate thread
     let result = tokio::task::spawn_blocking(move || {
-        println!("[check_java] spawn_blocking started after {:?}", start.elapsed());
-        println!("[check_java] Checking default java in PATH...");
-
         // First, try the default java in PATH
         if let Some(info) = check_java_executable("java") {
-            println!("[check_java] Found java in PATH, version: {:?}, valid: {}", info.version, info.is_valid);
             if info.is_valid {
                 return info;
             }
         }
 
-        println!("[check_java] Scanning for Java 25+ installations...");
-
         // If default java is not 25+, scan for Java 25+ installations
         if let Some(info) = find_java_25_installation() {
-            println!("[check_java] Found Java 25+ at: {:?}", info.java_path);
             return info;
         }
 
         // Fall back to reporting whatever java is in PATH (even if < 25)
         if let Some(info) = check_java_executable("java") {
-            println!("[check_java] Falling back to PATH java");
             return info;
         }
-
-        println!("[check_java] No Java found");
 
         // No Java found at all
         JavaInfo {
@@ -70,12 +57,8 @@ pub async fn check_java() -> JavaInfo {
     }).await;
 
     match result {
-        Ok(info) => {
-            println!("[check_java] Done. Valid: {}", info.is_valid);
-            info
-        }
+        Ok(info) => info,
         Err(e) => {
-            println!("[check_java] Error: {}", e);
             JavaInfo {
                 installed: false,
                 version: None,
@@ -328,11 +311,7 @@ fn extract_version(line: &str) -> Option<String> {
 /// Detects Hytale installation paths based on the operating system
 #[tauri::command]
 pub fn get_system_paths() -> SystemPaths {
-    let start = std::time::Instant::now();
-    println!("[get_system_paths] Starting...");
-
     let launcher_path = get_hytale_launcher_path();
-    println!("[get_system_paths] get_hytale_launcher_path() took {:?}", start.elapsed());
 
     if let Some(ref base_path) = launcher_path {
         let base = std::path::Path::new(base_path);
@@ -342,7 +321,6 @@ pub fn get_system_paths() -> SystemPaths {
         let server_exists = server_path.exists();
         let assets_exists = assets_path.exists();
 
-        println!("[get_system_paths] Done in {:?}", start.elapsed());
         SystemPaths {
             hytale_launcher_path: launcher_path,
             server_path: if server_exists { Some(server_path.to_string_lossy().to_string()) } else { None },
@@ -350,7 +328,6 @@ pub fn get_system_paths() -> SystemPaths {
             exists: server_exists && assets_exists,
         }
     } else {
-        println!("[get_system_paths] No launcher path found, done in {:?}", start.elapsed());
         SystemPaths {
             hytale_launcher_path: None,
             server_path: None,

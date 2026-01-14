@@ -65,17 +65,13 @@ fn get_cli_directory(app: &AppHandle) -> Option<PathBuf> {
 
 /// Find hytale-downloader in app directory or PATH
 fn find_downloader_with_app(app: Option<&AppHandle>) -> Option<String> {
-    let start = std::time::Instant::now();
     let exe_name = get_downloader_executable();
-    println!("[find_downloader] Looking for: {}", exe_name);
 
     // First check app data directory if app handle is provided
     if let Some(app) = app {
         if let Some(app_dir) = get_cli_directory(app) {
             let cli_path = app_dir.join(exe_name);
-            println!("[find_downloader] Checking app dir: {:?}", cli_path);
             if cli_path.exists() {
-                println!("[find_downloader] Found in app dir in {:?}", start.elapsed());
                 return Some(cli_path.to_string_lossy().to_string());
             }
         }
@@ -88,24 +84,17 @@ fn find_downloader_with_app(app: Option<&AppHandle>) -> Option<String> {
         "which"
     };
 
-    println!("[find_downloader] Running {} {}...", which_cmd, exe_name);
-    let which_start = std::time::Instant::now();
     if let Ok(output) = Command::new(which_cmd).arg(exe_name).output() {
-        println!("[find_downloader] {} took {:?}", which_cmd, which_start.elapsed());
         if output.status.success() {
             if let Some(path) = String::from_utf8_lossy(&output.stdout).lines().next() {
                 let path = path.trim().to_string();
                 if !path.is_empty() {
-                    println!("[find_downloader] Found in PATH: {}", path);
                     return Some(path);
                 }
             }
         }
-    } else {
-        println!("[find_downloader] {} command failed after {:?}", which_cmd, which_start.elapsed());
     }
 
-    println!("[find_downloader] Not found, total time: {:?}", start.elapsed());
     None
 }
 
@@ -113,14 +102,9 @@ fn find_downloader_with_app(app: Option<&AppHandle>) -> Option<String> {
 /// This only checks if the executable exists, doesn't run any commands
 #[tauri::command]
 pub fn get_downloader_info(app: AppHandle) -> DownloaderInfo {
-    let start = std::time::Instant::now();
-    println!("[get_downloader_info] Checking for CLI...");
-
     let path = find_downloader_with_app(Some(&app));
-    println!("[get_downloader_info] find_downloader_with_app took {:?}", start.elapsed());
 
     if path.is_none() {
-        println!("[get_downloader_info] CLI not found, done in {:?}", start.elapsed());
         return DownloaderInfo {
             available: false,
             cli_version: None,
@@ -129,8 +113,6 @@ pub fn get_downloader_info(app: AppHandle) -> DownloaderInfo {
             error: None,
         };
     }
-
-    println!("[get_downloader_info] CLI found at: {:?}, done in {:?}", path, start.elapsed());
 
     // Just return that it's available, don't execute commands here
     // to avoid blocking the UI
