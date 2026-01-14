@@ -89,10 +89,13 @@ export function WhitelistEditor({ instancePath, isRunning }: WhitelistEditorProp
         dataToSave = whitelist;
       }
 
+      console.log("Saving whitelist to:", instancePath);
+      console.log("Data to save:", dataToSave);
       const result = await invoke<JsonWriteResult>("save_whitelist", {
         instancePath,
         whitelist: dataToSave,
       });
+      console.log("Save result:", result);
 
       if (result.success) {
         setWhitelist(dataToSave);
