@@ -11,6 +11,7 @@ import {
   FileText,
   Settings,
   Activity,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +21,7 @@ import {
   LogsTab,
   SettingsTab,
   MetricsTab,
+  PlayersTab,
   type MetricDataPoint,
 } from "./server-detail";
 import { useConsoleStore, type ConsoleMessage } from "@/lib/console-store";
@@ -38,6 +40,10 @@ import type {
   SystemMetrics,
   LogFile,
   LogReadResult,
+  OnlinePlayer,
+  PlayerJoinEvent,
+  PlayerLeaveEvent,
+  OnlinePlayersResponse,
 } from "@/lib/types";
 
 interface ServerDetailViewProps {
@@ -100,6 +106,9 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
   const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
   const [metricsHistory, setMetricsHistory] = useState<MetricDataPoint[]>([]);
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null);
+
+  // Players state
+  const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
 
   // Add message to console (using store)
   const addConsoleMessage = useCallback((text: string, type: ConsoleMessage["type"]) => {
@@ -191,6 +200,7 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
             setAuthStatus("none");
             setAuthEvent(null);
             setStartingAuth(false);
+            setOnlinePlayers([]);
           }
         }
       });
@@ -271,6 +281,30 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
         }
       });
       if (isMounted) unlisteners.push(exitUnlisten);
+
+      // Listen for player join events
+      const playerJoinUnlisten = await listen<PlayerJoinEvent>("player-joined", (event) => {
+        if (isMounted && event.payload.instance_id === instance.id) {
+          setOnlinePlayers((prev) => {
+            // Avoid duplicates
+            if (prev.some((p) => p.uuid === event.payload.player.uuid)) {
+              return prev;
+            }
+            return [...prev, event.payload.player];
+          });
+          addMessageRef.current(`Player joined: ${event.payload.player.name}`, "system");
+        }
+      });
+      if (isMounted) unlisteners.push(playerJoinUnlisten);
+
+      // Listen for player leave events
+      const playerLeaveUnlisten = await listen<PlayerLeaveEvent>("player-left", (event) => {
+        if (isMounted && event.payload.instance_id === instance.id) {
+          setOnlinePlayers((prev) => prev.filter((p) => p.uuid !== event.payload.uuid));
+          addMessageRef.current(`Player left: ${event.payload.player_name}`, "system");
+        }
+      });
+      if (isMounted) unlisteners.push(playerLeaveUnlisten);
     }
 
     setupListeners();
@@ -323,6 +357,27 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 3000);
     return () => clearInterval(interval);
+  }, [instance.id, status]);
+
+  // Fetch online players when server starts running
+  useEffect(() => {
+    if (status !== "running") {
+      setOnlinePlayers([]);
+      return;
+    }
+
+    async function fetchPlayers() {
+      try {
+        const response = await invoke<OnlinePlayersResponse>("get_online_players", {
+          instanceId: instance.id,
+        });
+        setOnlinePlayers(response.players);
+      } catch (err) {
+        console.error("Failed to fetch players:", err);
+      }
+    }
+
+    fetchPlayers();
   }, [instance.id, status]);
 
   // Fetch log files when logs tab is active
@@ -573,6 +628,18 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
     }
   }
 
+  // Refresh online players
+  async function handleRefreshPlayers() {
+    try {
+      const response = await invoke<OnlinePlayersResponse>("get_online_players", {
+        instanceId: instance.id,
+      });
+      setOnlinePlayers(response.players);
+    } catch (err) {
+      console.error("Failed to refresh players:", err);
+    }
+  }
+
   // Format uptime
   function formatUptime(): string {
     if (!startedAt) return "-";
@@ -615,6 +682,15 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
               <TabsTrigger value="console" className="gap-1.5">
                 <Terminal className="h-3.5 w-3.5" />
                 Console
+              </TabsTrigger>
+              <TabsTrigger value="players" className="gap-1.5">
+                <Users className="h-3.5 w-3.5" />
+                Players
+                {onlinePlayers.length > 0 && (
+                  <span className="ml-1 rounded-full bg-primary/20 px-1.5 py-0.5 text-xs">
+                    {onlinePlayers.length}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger value="logs" className="gap-1.5">
                 <FileText className="h-3.5 w-3.5" />
@@ -785,6 +861,15 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
               metrics={metrics}
               metricsHistory={metricsHistory}
               uptime={formatUptime()}
+            />
+          </TabsContent>
+
+          {/* Players Tab */}
+          <TabsContent value="players" className="flex-1 overflow-auto mt-0">
+            <PlayersTab
+              isRunning={isRunning}
+              players={onlinePlayers}
+              onRefresh={handleRefreshPlayers}
             />
           </TabsContent>
         </Tabs>

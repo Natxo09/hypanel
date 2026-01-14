@@ -162,6 +162,30 @@ export interface AuthSuccessEvent {
 // Auth state for UI
 export type AuthStatus = "none" | "needs_auth" | "awaiting_code" | "authenticated";
 
+// Player tracking types
+export interface OnlinePlayer {
+  name: string;
+  uuid: string;
+  joined_at: string;
+}
+
+export interface PlayerJoinEvent {
+  instance_id: string;
+  player: OnlinePlayer;
+}
+
+export interface PlayerLeaveEvent {
+  instance_id: string;
+  player_name: string;
+  uuid: string;
+}
+
+export interface OnlinePlayersResponse {
+  instance_id: string;
+  players: OnlinePlayer[];
+  count: number;
+}
+
 // Metrics types
 export interface ServerMetrics {
   instance_id: string;

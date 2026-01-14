@@ -71,6 +71,37 @@ pub struct AuthSuccessEvent {
     pub auth_mode: String,  // e.g. "OAUTH_DEVICE"
 }
 
+/// Represents an online player
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OnlinePlayer {
+    pub name: String,
+    pub uuid: String,
+    pub joined_at: String,  // ISO-8601 timestamp
+}
+
+/// Event emitted when a player joins
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlayerJoinEvent {
+    pub instance_id: String,
+    pub player: OnlinePlayer,
+}
+
+/// Event emitted when a player leaves
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlayerLeaveEvent {
+    pub instance_id: String,
+    pub player_name: String,
+    pub uuid: String,
+}
+
+/// Response for get_online_players command
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OnlinePlayersResponse {
+    pub instance_id: String,
+    pub players: Vec<OnlinePlayer>,
+    pub count: usize,
+}
+
 // ============================================================================
 // Server State Management
 // ============================================================================
@@ -81,6 +112,7 @@ pub struct ServerProcess {
     pub instance_id: String,
     pub started_at: DateTime<Utc>,
     pub stdin_tx: Option<std::sync::mpsc::Sender<String>>,
+    pub online_players: HashMap<String, OnlinePlayer>,  // uuid -> player
 }
 
 pub struct ServerState {
@@ -254,6 +286,7 @@ pub async fn start_server(
         instance_id: instance_id.clone(),
         started_at,
         stdin_tx: Some(stdin_tx),
+        online_players: HashMap::new(),
     }));
 
     // Store in state
@@ -296,6 +329,7 @@ pub async fn start_server(
     // Spawn thread to read stdout
     let app_stdout = app.clone();
     let instance_id_stdout = instance_id.clone();
+    let state_for_stdout = state.inner().clone();
     if let Some(stdout) = stdout {
         std::thread::spawn(move || {
             let reader = BufReader::new(stdout);
@@ -361,6 +395,49 @@ pub async fn start_server(
                                 auth_mode,
                             };
                             let _ = app_stdout.emit("server-auth-success", &success_event);
+                        }
+
+                        // Check for player join
+                        if let Some((name, uuid)) = parse_player_join(&text) {
+                            let player = OnlinePlayer {
+                                name: name.clone(),
+                                uuid: uuid.clone(),
+                                joined_at: Utc::now().to_rfc3339(),
+                            };
+
+                            // Update player state
+                            if let Ok(state_guard) = state_for_stdout.lock() {
+                                if let Some(process_arc) = state_guard.processes.get(&instance_id_stdout) {
+                                    if let Ok(mut process) = process_arc.lock() {
+                                        process.online_players.insert(uuid.clone(), player.clone());
+                                    }
+                                }
+                            }
+
+                            let join_event = PlayerJoinEvent {
+                                instance_id: instance_id_stdout.clone(),
+                                player,
+                            };
+                            let _ = app_stdout.emit("player-joined", &join_event);
+                        }
+
+                        // Check for player leave
+                        if let Some((name, uuid)) = parse_player_leave(&text) {
+                            // Remove from state
+                            if let Ok(state_guard) = state_for_stdout.lock() {
+                                if let Some(process_arc) = state_guard.processes.get(&instance_id_stdout) {
+                                    if let Ok(mut process) = process_arc.lock() {
+                                        process.online_players.remove(&uuid);
+                                    }
+                                }
+                            }
+
+                            let leave_event = PlayerLeaveEvent {
+                                instance_id: instance_id_stdout.clone(),
+                                player_name: name,
+                                uuid,
+                            };
+                            let _ = app_stdout.emit("player-left", &leave_event);
                         }
                     }
                     Err(e) => {
@@ -667,6 +744,33 @@ pub fn send_server_command(
     }
 }
 
+/// Get online players for a server instance
+#[tauri::command]
+pub fn get_online_players(
+    state: State<'_, Arc<Mutex<ServerState>>>,
+    instance_id: String,
+) -> OnlinePlayersResponse {
+    let state_guard = state.lock().unwrap();
+
+    match state_guard.processes.get(&instance_id) {
+        Some(process_arc) => {
+            let process = process_arc.lock().unwrap();
+            let players: Vec<OnlinePlayer> = process.online_players.values().cloned().collect();
+            let count = players.len();
+            OnlinePlayersResponse {
+                instance_id,
+                players,
+                count,
+            }
+        }
+        None => OnlinePlayersResponse {
+            instance_id,
+            players: vec![],
+            count: 0,
+        },
+    }
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -733,5 +837,55 @@ fn parse_auth_event(instance_id: &str, line: &str) -> Option<AuthEvent> {
         }
     }
 
+    None
+}
+
+/// Parse player join event from server output
+/// Matches: [Universe|P] Adding player 'Natxo (44f4d846-35c9-42d0-a463-87df984918b2)
+fn parse_player_join(line: &str) -> Option<(String, String)> {
+    let clean_line = strip_ansi_codes(line);
+
+    if clean_line.contains("[Universe|P] Adding player") {
+        // Extract: 'PlayerName (uuid)
+        if let Some(start) = clean_line.find("'") {
+            let after_quote = &clean_line[start + 1..];
+            // Find the opening paren for UUID
+            if let Some(paren_pos) = after_quote.find(" (") {
+                let name = after_quote[..paren_pos].to_string();
+                let uuid_start = paren_pos + 2;
+                // Find closing paren
+                if let Some(uuid_end) = after_quote[uuid_start..].find(")") {
+                    let uuid = after_quote[uuid_start..uuid_start + uuid_end].to_string();
+                    return Some((name, uuid));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Parse player leave event from server output
+/// Matches: [Universe|P] Removing player 'Natxo' (44f4d846-35c9-42d0-a463-87df984918b2)
+fn parse_player_leave(line: &str) -> Option<(String, String)> {
+    let clean_line = strip_ansi_codes(line);
+
+    if clean_line.contains("[Universe|P] Removing player") {
+        // Extract: 'PlayerName' (uuid)
+        if let Some(start) = clean_line.find("'") {
+            let after_quote = &clean_line[start + 1..];
+            if let Some(end_quote) = after_quote.find("'") {
+                let name = after_quote[..end_quote].to_string();
+                // Find UUID in parentheses after the name
+                let rest = &after_quote[end_quote + 1..];
+                if let Some(paren_start) = rest.find("(") {
+                    let uuid_start = paren_start + 1;
+                    if let Some(uuid_end) = rest[uuid_start..].find(")") {
+                        let uuid = rest[uuid_start..uuid_start + uuid_end].to_string();
+                        return Some((name, uuid));
+                    }
+                }
+            }
+        }
+    }
     None
 }

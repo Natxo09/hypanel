@@ -13,7 +13,7 @@ use commands::{
     update_instance_auth_status,
     // Server management
     start_server, stop_server, get_server_status, get_all_server_statuses, send_server_command,
-    ServerState,
+    get_online_players, ServerState,
     // Logs
     list_log_files, read_log_file, tail_log_file,
     // Metrics
@@ -84,6 +84,7 @@ pub fn run() {
             get_server_status,
             get_all_server_statuses,
             send_server_command,
+            get_online_players,
             // Logs
             list_log_files,
             read_log_file,
