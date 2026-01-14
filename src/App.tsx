@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { WindowTitlebar } from "@/components/layout/WindowTitlebar";
 import { Onboarding } from "@/components/Onboarding";
 import { Dashboard } from "@/components/Dashboard";
+import { ConsoleStoreProvider } from "@/lib/console-store";
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -36,7 +37,11 @@ function App() {
     );
   }
 
-  return onboardingComplete ? <Dashboard /> : <Onboarding />;
+  return (
+    <ConsoleStoreProvider>
+      {onboardingComplete ? <Dashboard /> : <Onboarding />}
+    </ConsoleStoreProvider>
+  );
 }
 
 export default App;

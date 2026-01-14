@@ -2,13 +2,8 @@ import { useRef, useEffect } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-export interface ConsoleMessage {
-  id: number;
-  text: string;
-  type: "stdout" | "stderr" | "system" | "command";
-  timestamp: string;
-}
+import { ConsoleLine } from "@/components/ui/log-line";
+import type { ConsoleMessage } from "@/lib/console-store";
 
 interface ConsoleTabProps {
   consoleOutput: ConsoleMessage[];
@@ -53,20 +48,11 @@ export function ConsoleTab({
           </p>
         ) : (
           consoleOutput.map((msg) => (
-            <div
+            <ConsoleLine
               key={msg.id}
-              className={`whitespace-pre-wrap break-all leading-relaxed ${
-                msg.type === "stderr"
-                  ? "text-red-400"
-                  : msg.type === "system"
-                  ? "text-yellow-400"
-                  : msg.type === "command"
-                  ? "text-blue-400"
-                  : "text-zinc-300"
-              }`}
-            >
-              {msg.text}
-            </div>
+              text={msg.text}
+              type={msg.type}
+            />
           ))
         )}
       </div>

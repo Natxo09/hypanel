@@ -1,6 +1,7 @@
 import { FileText, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LogLine } from "@/components/ui/log-line";
 import type { LogFile, LogReadResult } from "@/lib/types";
 
 interface LogsTabProps {
@@ -65,20 +66,11 @@ export function LogsTab({
       </div>
       <div className="flex-1 rounded-lg bg-zinc-950 p-3 font-mono text-xs overflow-auto selectable">
         {logContent?.lines.map((line) => (
-          <div
+          <LogLine
             key={line.line_number}
-            className={`whitespace-pre-wrap break-all leading-relaxed ${
-              line.level === "ERROR"
-                ? "text-red-400"
-                : line.level === "WARN"
-                ? "text-yellow-400"
-                : line.level === "DEBUG"
-                ? "text-zinc-500"
-                : "text-zinc-300"
-            }`}
-          >
-            {line.content}
-          </div>
+            line={line.content}
+            showTimestamp={true}
+          />
         ))}
       </div>
     </>

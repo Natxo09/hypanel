@@ -1,4 +1,4 @@
-export { ConsoleTab, type ConsoleMessage } from "./ConsoleTab";
+export { ConsoleTab } from "./ConsoleTab";
 export { LogsTab } from "./LogsTab";
 export { SettingsTab } from "./SettingsTab";
-export { MetricsTab } from "./MetricsTab";
+export { MetricsTab, type MetricDataPoint } from "./MetricsTab";

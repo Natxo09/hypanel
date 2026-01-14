@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -20,8 +20,9 @@ import {
   LogsTab,
   SettingsTab,
   MetricsTab,
-  type ConsoleMessage,
+  type MetricDataPoint,
 } from "./server-detail";
+import { useConsoleStore, type ConsoleMessage } from "@/lib/console-store";
 import type {
   Instance,
   ServerStatus,
@@ -42,6 +43,9 @@ interface ServerDetailViewProps {
 }
 
 export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerDetailViewProps) {
+  // Console store (persists across navigation)
+  const consoleStore = useConsoleStore();
+
   // Server state
   const [status, setStatus] = useState<ServerStatus>("stopped");
   const [, setPid] = useState<number | null>(null);
@@ -49,12 +53,21 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
   const [authEvent, setAuthEvent] = useState<AuthEvent | null>(null);
   const [activeTab, setActiveTab] = useState("console");
 
-  // Console state
-  const [consoleOutput, setConsoleOutput] = useState<ConsoleMessage[]>([]);
+  // Console state (local UI state)
   const [commandInput, setCommandInput] = useState("");
-  const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [messageIdRef] = useState({ current: 0 });
+  const [consoleRefreshKey, setConsoleRefreshKey] = useState(0);
+
+  // Get messages from store (memoized to trigger re-renders)
+  const consoleOutput = useMemo(() => {
+    // consoleRefreshKey triggers re-computation when messages are added
+    void consoleRefreshKey;
+    return consoleStore.getMessages(instance.id);
+  }, [consoleStore, instance.id, consoleRefreshKey]);
+
+  const commandHistory = useMemo(() => {
+    return consoleStore.getCommandHistory(instance.id);
+  }, [consoleStore, instance.id, consoleRefreshKey]);
 
   // Settings state
   const [settingsForm, setSettingsForm] = useState({
@@ -73,19 +86,13 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
 
   // Metrics state
   const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
+  const [metricsHistory, setMetricsHistory] = useState<MetricDataPoint[]>([]);
 
-  // Add message to console
+  // Add message to console (using store)
   const addConsoleMessage = useCallback((text: string, type: ConsoleMessage["type"]) => {
-    setConsoleOutput((prev) => [
-      ...prev,
-      {
-        id: messageIdRef.current++,
-        text,
-        type,
-        timestamp: new Date().toISOString(),
-      },
-    ]);
-  }, [messageIdRef]);
+    consoleStore.addMessage(instance.id, text, type);
+    setConsoleRefreshKey((k) => k + 1);
+  }, [consoleStore, instance.id]);
 
   // Fetch initial status
   useEffect(() => {
@@ -104,61 +111,75 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
     fetchStatus();
   }, [instance.id]);
 
-  // Subscribe to events
+  // Subscribe to events - use ref to avoid stale closures
+  const addMessageRef = useRef(addConsoleMessage);
+  addMessageRef.current = addConsoleMessage;
+
   useEffect(() => {
+    let isMounted = true;
     const unlisteners: UnlistenFn[] = [];
 
-    listen<ServerOutput>("server-output", (event) => {
-      if (event.payload.instance_id === instance.id) {
-        addConsoleMessage(
-          event.payload.line,
-          event.payload.stream as "stdout" | "stderr"
-        );
-      }
-    }).then((unlisten) => unlisteners.push(unlisten));
-
-    listen<ServerStatusInfo>("server-status-change", (event) => {
-      if (event.payload.instance_id === instance.id) {
-        setStatus(event.payload.status);
-        setPid(event.payload.pid);
-        setStartedAt(event.payload.started_at);
-
-        if (event.payload.status === "running") {
-          addConsoleMessage("Server started successfully", "system");
-        } else if (event.payload.status === "stopped") {
-          addConsoleMessage("Server stopped", "system");
-          setAuthEvent(null);
+    async function setupListeners() {
+      const outputUnlisten = await listen<ServerOutput>("server-output", (event) => {
+        if (isMounted && event.payload.instance_id === instance.id) {
+          addMessageRef.current(
+            event.payload.line,
+            event.payload.stream as "stdout" | "stderr"
+          );
         }
-      }
-    }).then((unlisten) => unlisteners.push(unlisten));
+      });
+      if (isMounted) unlisteners.push(outputUnlisten);
 
-    listen<AuthEvent>("server-auth-required", (event) => {
-      if (event.payload.instance_id === instance.id) {
-        setAuthEvent(event.payload);
-        addConsoleMessage(
-          `Authentication required. Code: ${event.payload.code}`,
-          "system"
-        );
-      }
-    }).then((unlisten) => unlisteners.push(unlisten));
+      const statusUnlisten = await listen<ServerStatusInfo>("server-status-change", (event) => {
+        if (isMounted && event.payload.instance_id === instance.id) {
+          setStatus(event.payload.status);
+          setPid(event.payload.pid);
+          setStartedAt(event.payload.started_at);
 
-    listen<string>("server-auth-success", (event) => {
-      if (event.payload === instance.id) {
-        setAuthEvent(null);
-        addConsoleMessage("Authentication successful!", "system");
-      }
-    }).then((unlisten) => unlisteners.push(unlisten));
+          if (event.payload.status === "running") {
+            addMessageRef.current("Server started successfully", "system");
+          } else if (event.payload.status === "stopped") {
+            addMessageRef.current("Server stopped", "system");
+            setAuthEvent(null);
+          }
+        }
+      });
+      if (isMounted) unlisteners.push(statusUnlisten);
 
-    listen<string>("server-exit", (event) => {
-      if (event.payload === instance.id) {
-        addConsoleMessage("Server process exited", "system");
-      }
-    }).then((unlisten) => unlisteners.push(unlisten));
+      const authUnlisten = await listen<AuthEvent>("server-auth-required", (event) => {
+        if (isMounted && event.payload.instance_id === instance.id) {
+          setAuthEvent(event.payload);
+          addMessageRef.current(
+            `Authentication required. Code: ${event.payload.code}`,
+            "system"
+          );
+        }
+      });
+      if (isMounted) unlisteners.push(authUnlisten);
+
+      const authSuccessUnlisten = await listen<string>("server-auth-success", (event) => {
+        if (isMounted && event.payload === instance.id) {
+          setAuthEvent(null);
+          addMessageRef.current("Authentication successful!", "system");
+        }
+      });
+      if (isMounted) unlisteners.push(authSuccessUnlisten);
+
+      const exitUnlisten = await listen<string>("server-exit", (event) => {
+        if (isMounted && event.payload === instance.id) {
+          addMessageRef.current("Server process exited", "system");
+        }
+      });
+      if (isMounted) unlisteners.push(exitUnlisten);
+    }
+
+    setupListeners();
 
     return () => {
+      isMounted = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [instance.id, addConsoleMessage]);
+  }, [instance.id]);
 
   // Fetch metrics periodically when running
   useEffect(() => {
@@ -173,6 +194,27 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
           instanceId: instance.id,
         });
         setMetrics(m);
+
+        // Add to history (keep last 20 points)
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+
+        setMetricsHistory((prev) => {
+          const newHistory = [
+            ...prev,
+            {
+              time: timeStr,
+              cpu: m.cpu_usage !== null ? Math.round(m.cpu_usage * 10) / 10 : 0,
+              memory: m.memory_mb !== null ? Math.round(m.memory_mb) : 0,
+            },
+          ];
+          return newHistory.slice(-20);
+        });
       } catch (err) {
         console.error("Failed to fetch metrics:", err);
       }
@@ -231,7 +273,7 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
 
   // Start server
   async function handleStart() {
-    setConsoleOutput([]);
+    // Don't clear console - keep history for reference
     addConsoleMessage("Starting server...", "system");
 
     try {
@@ -279,9 +321,10 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
     const cmd = commandInput.trim();
     addConsoleMessage(`> ${cmd}`, "command");
 
-    setCommandHistory((prev) => [...prev.filter((c) => c !== cmd), cmd]);
+    consoleStore.addCommand(instance.id, cmd);
     setHistoryIndex(-1);
     setCommandInput("");
+    setConsoleRefreshKey((k) => k + 1);
 
     try {
       await invoke("send_server_command", {
@@ -316,13 +359,21 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
     }
   }
 
-  // Open folder
+  // Open folder in file explorer
   async function handleOpenFolder() {
     try {
       const opener = await import("@tauri-apps/plugin-opener");
-      await opener.openPath(instance.path);
+      // revealItemInDir opens the folder in file explorer and selects it
+      await opener.revealItemInDir(instance.path);
     } catch (err) {
       console.error("Failed to open folder:", err);
+      // Fallback to openPath
+      try {
+        const opener = await import("@tauri-apps/plugin-opener");
+        await opener.openPath(instance.path);
+      } catch (fallbackErr) {
+        console.error("Fallback also failed:", fallbackErr);
+      }
     }
   }
 
@@ -503,6 +554,7 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
             <MetricsTab
               isRunning={isRunning}
               metrics={metrics}
+              metricsHistory={metricsHistory}
               uptime={formatUptime()}
             />
           </TabsContent>
