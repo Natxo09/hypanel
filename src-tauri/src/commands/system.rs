@@ -25,10 +25,12 @@ pub struct SystemPaths {
 /// First checks PATH, then scans common installation directories
 #[tauri::command]
 pub async fn check_java() -> JavaInfo {
+    let start = std::time::Instant::now();
     println!("[check_java] Starting Java check...");
 
     // Run the blocking operations in a separate thread
-    let result = tokio::task::spawn_blocking(|| {
+    let result = tokio::task::spawn_blocking(move || {
+        println!("[check_java] spawn_blocking started after {:?}", start.elapsed());
         println!("[check_java] Checking default java in PATH...");
 
         // First, try the default java in PATH
@@ -326,7 +328,11 @@ fn extract_version(line: &str) -> Option<String> {
 /// Detects Hytale installation paths based on the operating system
 #[tauri::command]
 pub fn get_system_paths() -> SystemPaths {
+    let start = std::time::Instant::now();
+    println!("[get_system_paths] Starting...");
+
     let launcher_path = get_hytale_launcher_path();
+    println!("[get_system_paths] get_hytale_launcher_path() took {:?}", start.elapsed());
 
     if let Some(ref base_path) = launcher_path {
         let base = std::path::Path::new(base_path);
@@ -336,6 +342,7 @@ pub fn get_system_paths() -> SystemPaths {
         let server_exists = server_path.exists();
         let assets_exists = assets_path.exists();
 
+        println!("[get_system_paths] Done in {:?}", start.elapsed());
         SystemPaths {
             hytale_launcher_path: launcher_path,
             server_path: if server_exists { Some(server_path.to_string_lossy().to_string()) } else { None },
@@ -343,6 +350,7 @@ pub fn get_system_paths() -> SystemPaths {
             exists: server_exists && assets_exists,
         }
     } else {
+        println!("[get_system_paths] No launcher path found, done in {:?}", start.elapsed());
         SystemPaths {
             hytale_launcher_path: None,
             server_path: None,

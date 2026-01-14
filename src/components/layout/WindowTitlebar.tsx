@@ -108,26 +108,19 @@ interface WindowTitlebarProps {
 }
 
 export function WindowTitlebar({ showTitle = false, title = "HyPanel" }: WindowTitlebarProps) {
-  const [platform, setPlatform] = useState<Platform>("windows");
+  // Detect platform immediately to avoid flash
+  const [platform] = useState<Platform>(() => detectPlatform());
 
-  useEffect(() => {
-    setPlatform(detectPlatform());
-  }, []);
-
-  const isMacos = platform === "macos";
+  // Only show custom titlebar on Windows (macOS and Linux use native decorations)
+  if (platform !== "windows") {
+    return null;
+  }
 
   return (
     <div
       className="window-titlebar h-8 bg-sidebar flex items-center select-none"
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
-      {/* macOS: Controls on the left */}
-      {isMacos && (
-        <div style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-          <WindowControls platform={platform} />
-        </div>
-      )}
-
       {/* Drag region / Title */}
       <div
         data-tauri-drag-region
@@ -140,12 +133,10 @@ export function WindowTitlebar({ showTitle = false, title = "HyPanel" }: WindowT
         )}
       </div>
 
-      {/* Windows/Linux: Controls on the right */}
-      {!isMacos && (
-        <div style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-          <WindowControls platform={platform} />
-        </div>
-      )}
+      {/* Windows: Controls on the right */}
+      <div style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+        <WindowControls platform={platform} />
+      </div>
     </div>
   );
 }

@@ -3,6 +3,8 @@ mod database;
 
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
+#[cfg(target_os = "windows")]
+use tauri::WebviewWindowBuilder;
 
 use commands::{
     check_downloader, check_downloader_update, check_java, check_server_files,
@@ -33,6 +35,15 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // On Windows, disable native decorations to use custom titlebar
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_decorations(false);
+                    println!("[app] Windows: Custom titlebar enabled");
+                }
+            }
 
             // Initialize server state
             handle.manage(Arc::new(Mutex::new(ServerState::new())));

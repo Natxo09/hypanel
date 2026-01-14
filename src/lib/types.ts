@@ -23,7 +23,7 @@ export interface SystemStatus {
 }
 
 // Onboarding flow types
-export type FileSourceType = "launcher" | "download";
+export type FileSourceType = "launcher" | "download" | "existing";
 
 export interface OnboardingState {
   step: number;

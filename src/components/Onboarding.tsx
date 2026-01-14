@@ -13,6 +13,7 @@ import {
   Copy,
   ArrowRight,
   ArrowLeft,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +28,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { WindowTitlebar } from "@/components/layout/WindowTitlebar";
 import type { JavaInfo, SystemPaths, FileSourceType, CopyResult, DownloaderInfo, DownloadProgress, DownloadResult, InstallCliResult, ServerFilesStatus, InstanceResult } from "@/lib/types";
+
+function isMacOS(): boolean {
+  return navigator.platform.toLowerCase().includes("mac");
+}
 
 function StatusIcon({ ok, loading }: { ok: boolean; loading?: boolean }) {
   if (loading) {
@@ -415,11 +420,14 @@ export function Onboarding() {
 
               {/* Option B: Download with CLI */}
               <button
-                onClick={() => setSelectedSource("download")}
+                onClick={() => !isMacOS() && setSelectedSource("download")}
+                disabled={isMacOS()}
                 className={`w-full p-4 rounded-lg border text-left transition-colors ${
-                  selectedSource === "download"
-                    ? "border-primary bg-primary/5"
-                    : "hover:border-muted-foreground/50"
+                  isMacOS()
+                    ? "opacity-50 cursor-not-allowed"
+                    : selectedSource === "download"
+                      ? "border-primary bg-primary/5"
+                      : "hover:border-muted-foreground/50"
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -427,22 +435,64 @@ export function Onboarding() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">Download with hytale-downloader</p>
-                      {downloader?.available && (
+                      {isMacOS() ? (
+                        <Badge variant="outline" className="text-amber-500 border-amber-500/50">
+                          Not available
+                        </Badge>
+                      ) : downloader?.available ? (
                         <Badge variant="secondary">CLI Found</Badge>
-                      )}
+                      ) : null}
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {downloader?.available
-                        ? "Download server files using the official CLI tool"
-                        : "Download server files (requires hytale-downloader CLI)"}
-                    </p>
-                    {!downloader?.available && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Will be installed automatically in the next step
-                      </p>
+                    {isMacOS() ? (
+                      <div className="flex items-start gap-2 mt-2 p-2 rounded bg-amber-500/10 border border-amber-500/20">
+                        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-500">
+                          The hytale-downloader CLI is not available for macOS.
+                          Please use "Copy from Hytale Launcher" or manually copy the server files.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {downloader?.available
+                            ? "Download server files using the official CLI tool"
+                            : "Download server files (requires hytale-downloader CLI)"}
+                        </p>
+                        {!downloader?.available && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Will be installed automatically in the next step
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                   <CheckCircle2 className={`w-5 h-5 shrink-0 ${selectedSource === "download" ? "text-primary" : "text-transparent"}`} />
+                </div>
+              </button>
+
+              {/* Option C: Import existing server files */}
+              <button
+                onClick={() => setSelectedSource("existing")}
+                className={`w-full p-4 rounded-lg border text-left transition-colors ${
+                  selectedSource === "existing"
+                    ? "border-primary bg-primary/5"
+                    : "hover:border-muted-foreground/50"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <FolderOpen className="w-5 h-5 mt-0.5 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">Import existing server files</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Select a folder that already contains Hytale server files
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Use this if you already have the server files from another source
+                    </p>
+                  </div>
+                  <CheckCircle2 className={`w-5 h-5 shrink-0 ${selectedSource === "existing" ? "text-primary" : "text-transparent"}`} />
                 </div>
               </button>
             </CardContent>
@@ -472,14 +522,18 @@ export function Onboarding() {
               <CardDescription>
                 {selectedSource === "launcher"
                   ? "Choose where to copy the server files"
-                  : "Choose where to download the server files"}
+                  : selectedSource === "existing"
+                    ? "Select the folder containing your server files"
+                    : "Choose where to download the server files"}
               </CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-4">
               {/* Destination folder selection */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Destination Folder</label>
+                <label className="text-sm font-medium">
+                  {selectedSource === "existing" ? "Server Folder" : "Destination Folder"}
+                </label>
                 <div className="flex gap-2">
                   <div className="flex-1 p-3 rounded-lg border bg-muted/50 text-sm truncate">
                     {destinationPath || "No folder selected"}
@@ -521,6 +575,22 @@ export function Onboarding() {
                         {serverFilesStatus.has_server_jar && "HytaleServer.jar found"}
                         {serverFilesStatus.has_server_jar && serverFilesStatus.has_assets && " • "}
                         {serverFilesStatus.has_assets && "Assets.zip found"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Error when "existing" selected but no server files found */}
+              {selectedSource === "existing" && destinationPath && serverFilesStatus && !serverFilesStatus.exists && (
+                <div className="p-4 rounded-lg border bg-destructive/10 border-destructive/20">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-5 h-5 text-destructive" />
+                    <div>
+                      <p className="font-medium">Server files not found</p>
+                      <p className="text-sm text-muted-foreground">
+                        The selected folder does not contain valid Hytale server files.
+                        Make sure it contains Server/HytaleServer.jar
                       </p>
                     </div>
                   </div>

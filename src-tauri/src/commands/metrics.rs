@@ -40,9 +40,17 @@ pub struct MetricsState {
 
 impl MetricsState {
     pub fn new() -> Self {
+        println!("[MetricsState] Creating new System instance...");
+        let start = std::time::Instant::now();
+
         let mut system = System::new_all();
-        // Initial refresh to populate data
+        println!("[MetricsState] System::new_all() took {:?}", start.elapsed());
+
+        let refresh_start = std::time::Instant::now();
         system.refresh_all();
+        println!("[MetricsState] refresh_all() took {:?}", refresh_start.elapsed());
+
+        println!("[MetricsState] Total initialization took {:?}", start.elapsed());
         Self { system }
     }
 }
@@ -176,16 +184,27 @@ pub fn get_all_server_metrics(
 pub fn get_system_metrics(
     metrics_state: State<'_, Arc<Mutex<MetricsState>>>,
 ) -> SystemMetrics {
+    let start = std::time::Instant::now();
+    println!("[get_system_metrics] Called");
+
     let mut metrics = metrics_state.lock().unwrap();
+    println!("[get_system_metrics] Lock acquired in {:?}", start.elapsed());
 
     // Only refresh what we need - much faster than refresh_all()
+    let refresh_start = std::time::Instant::now();
     metrics.system.refresh_memory();
+    println!("[get_system_metrics] refresh_memory() took {:?}", refresh_start.elapsed());
+
+    let cpu_start = std::time::Instant::now();
     metrics.system.refresh_cpu_all();
+    println!("[get_system_metrics] refresh_cpu_all() took {:?}", cpu_start.elapsed());
 
     let total_memory = metrics.system.total_memory();
     let used_memory = metrics.system.used_memory();
     let available_memory = metrics.system.available_memory();
     let cpu_usage = metrics.system.global_cpu_usage();
+
+    println!("[get_system_metrics] Total time: {:?}", start.elapsed());
 
     SystemMetrics {
         total_memory_mb: total_memory as f64 / 1024.0 / 1024.0,
