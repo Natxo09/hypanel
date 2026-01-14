@@ -135,7 +135,7 @@ pub async fn get_firewall_info(port: u16, server_name: String) -> Result<Firewal
     #[cfg(target_os = "windows")]
     {
         let firewall_enabled = check_windows_firewall_enabled();
-        let rule_exists = check_windows_rule_exists(&_rule_name);
+        let rule_exists = check_windows_rule_exists(&rule_name);
 
         Ok(FirewallInfo {
             os: os.to_string(),

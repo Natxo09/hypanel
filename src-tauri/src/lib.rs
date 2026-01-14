@@ -3,8 +3,6 @@ mod database;
 
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
-#[cfg(target_os = "windows")]
-use tauri::WebviewWindowBuilder;
 
 use commands::{
     check_downloader, check_downloader_update, check_java, check_server_files,
