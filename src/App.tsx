@@ -5,6 +5,7 @@ import { WindowTitlebar } from "@/components/layout/WindowTitlebar";
 import { Onboarding } from "@/components/Onboarding";
 import { Dashboard } from "@/components/Dashboard";
 import { ConsoleStoreProvider } from "@/lib/console-store";
+import { AppUpdateNotification } from "@/components/AppUpdateNotification";
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -40,6 +41,7 @@ function App() {
   return (
     <ConsoleStoreProvider>
       {onboardingComplete ? <Dashboard /> : <Onboarding />}
+      <AppUpdateNotification />
     </ConsoleStoreProvider>
   );
 }

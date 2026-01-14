@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, CheckCircle, ArrowUpCircle } from "lucide-react";
+import { RefreshCw, CheckCircle, ArrowUpCircle, Download } from "lucide-react";
+import { useUpdater } from "@/hooks/useUpdater";
 import {
   Card,
   CardContent,
@@ -15,6 +16,17 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import type { VersionSettings, VersionCheckResult } from "@/lib/types";
 
 export function SettingsView() {
+  const {
+    checking: appChecking,
+    available: appUpdateAvailable,
+    downloading: appDownloading,
+    progress: appProgress,
+    update: appUpdate,
+    upToDate: appUpToDate,
+    checkForUpdates: checkAppUpdates,
+    downloadAndInstall: installAppUpdate,
+  } = useUpdater(false);
+
   const [settings, setSettings] = useState<VersionSettings>({
     check_on_startup: true,
     check_periodic: false,
@@ -110,7 +122,89 @@ export function SettingsView() {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Version Checking</CardTitle>
+            <CardTitle className="text-base">Application Updates</CardTitle>
+            <CardDescription>
+              Check for HyPanel application updates
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">Current version</p>
+                <p className="text-xs text-muted-foreground font-mono">
+                  v{__APP_VERSION__}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={checkAppUpdates}
+                disabled={appChecking || appDownloading}
+              >
+                {appChecking ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Check for updates
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {appUpdateAvailable && appUpdate && (
+              <div className="rounded-lg p-3 bg-blue-500/10 border border-blue-500/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpCircle className="h-4 w-4 text-blue-400" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-100">
+                        Update available: v{appUpdate.version}
+                      </p>
+                    </div>
+                  </div>
+                  {appDownloading ? (
+                    <div className="flex items-center gap-2 text-xs text-blue-300">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      {appProgress}%
+                    </div>
+                  ) : (
+                    <Button size="sm" className="h-7 text-xs" onClick={installAppUpdate}>
+                      <Download className="h-3 w-3 mr-1.5" />
+                      Install
+                    </Button>
+                  )}
+                </div>
+                {appDownloading && (
+                  <div className="mt-2 h-1.5 rounded-full bg-blue-500/20 overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 transition-all duration-300"
+                      style={{ width: `${appProgress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {appUpToDate && (
+              <div className="rounded-lg p-3 bg-green-500/10 border border-green-500/30">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <p className="text-sm font-medium text-green-100">
+                    You're up to date
+                  </p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Server Version Checking</CardTitle>
             <CardDescription>
               Configure automatic update checks for server versions
             </CardDescription>

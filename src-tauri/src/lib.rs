@@ -45,6 +45,14 @@ pub fn run() {
                 }
             }
 
+            // Initialize updater and process plugins (desktop only)
+            #[cfg(desktop)]
+            {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+                println!("[app] Updater and process plugins initialized");
+            }
+
             // Initialize server state
             handle.manage(Arc::new(Mutex::new(ServerState::new())));
             println!("[app] Server state initialized");

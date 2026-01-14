@@ -67,7 +67,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'HyPanel ${{ github.ref_name }}'
           releaseBody: |
-            See the [CHANGELOG](https://github.com/Natxo09/hypanel/blob/master/CHANGELOG.md) for details.
+            See the [CHANGELOG](https://github.com/Natxo09/hypanel/blob/main/CHANGELOG.md) for details.
 
             ## Installation
 
