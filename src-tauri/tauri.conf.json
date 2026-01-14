@@ -40,7 +40,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM0Q0IyQzY5Qzk2QTNCRDEKUldUUk8yckphU3pMeFA3ZURkOXJWM2hPb0N4cE5DRm9HMFp6NmV6TFd0TjV1d094WUhjaExVTmUK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE0MkZCNkYxMTNGM0Q2MDcKUldRSDF2TVQ4Yll2Rk9mZlZJS1RrMU1JbDg3Z0N1V0IyMjlKN1FtM0xxbld2UEMxVElvcDlwOTYK",
       "endpoints": [
         "https://github.com/Natxo09/hypanel/releases/latest/download/latest.json"
       ]
