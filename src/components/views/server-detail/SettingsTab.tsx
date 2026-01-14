@@ -7,6 +7,7 @@ import { JvmSettingsSection } from "./JvmSettingsSection";
 import { ServerArgsSection, type ServerArgsSettings, type UsedPort } from "./ServerArgsSection";
 import { CommandPreview } from "./CommandPreview";
 import { NetworkSection } from "./NetworkSection";
+import { AuthSection } from "./AuthSection";
 import type { Instance, SystemMetrics } from "@/lib/types";
 
 // Helper to extract port from server_args string
@@ -39,8 +40,10 @@ interface SettingsTabProps {
   systemMetrics: SystemMetrics | null;
   allInstances: Instance[];
   isSaving: boolean;
+  isRunning: boolean;
   onFormChange: (updates: Partial<SettingsFormState>) => void;
   onSave: () => void;
+  onRefreshInstance?: () => void;
 }
 
 // Parse JVM args string to structured format
@@ -212,8 +215,10 @@ export function SettingsTab({
   systemMetrics,
   allInstances,
   isSaving,
+  isRunning,
   onFormChange,
   onSave,
+  onRefreshInstance,
 }: SettingsTabProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -322,6 +327,15 @@ export function SettingsTab({
           instancePath={instance.path}
           usedPorts={usedPorts}
           onChange={handleServerArgsChange}
+        />
+      </div>
+
+      {/* Authentication */}
+      <div className="rounded-lg border bg-card p-4">
+        <AuthSection
+          instance={instance}
+          isRunning={isRunning}
+          onRefresh={onRefreshInstance}
         />
       </div>
 

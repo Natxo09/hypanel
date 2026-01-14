@@ -31,6 +31,9 @@ import type {
   StartResult,
   StopResult,
   AuthEvent,
+  AuthNeededEvent,
+  AuthSuccessEvent,
+  AuthStatus,
   ServerMetrics,
   SystemMetrics,
   LogFile,
@@ -44,15 +47,22 @@ interface ServerDetailViewProps {
   onUpdateInstance?: (instance: Instance) => void;
 }
 
-export function ServerDetailView({ instance, allInstances, onBack, onUpdateInstance }: ServerDetailViewProps) {
+export function ServerDetailView({ instance: initialInstance, allInstances, onBack, onUpdateInstance }: ServerDetailViewProps) {
   // Console store (persists across navigation)
   const consoleStore = useConsoleStore();
+
+  // Local instance state (to update when auth changes)
+  const [instance, setInstance] = useState<Instance>(initialInstance);
 
   // Server state
   const [status, setStatus] = useState<ServerStatus>("stopped");
   const [, setPid] = useState<number | null>(null);
   const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("none");
   const [authEvent, setAuthEvent] = useState<AuthEvent | null>(null);
+  const [startingAuth, setStartingAuth] = useState(false);
+  const [needsPersistence, setNeedsPersistence] = useState(false);
+  const [savingPersistence, setSavingPersistence] = useState(false);
   const [activeTab, setActiveTab] = useState("console");
 
   // Console state (local UI state)
@@ -120,6 +130,22 @@ export function ServerDetailView({ instance, allInstances, onBack, onUpdateInsta
     fetchStatus();
   }, [instance.id]);
 
+  // Reload instance from database
+  const reloadInstance = useCallback(async () => {
+    try {
+      const result = await invoke<{ success: boolean; instance: Instance | null }>(
+        "get_server_instance",
+        { instanceId: instance.id }
+      );
+      if (result.success && result.instance) {
+        setInstance(result.instance);
+        onUpdateInstance?.(result.instance);
+      }
+    } catch (err) {
+      console.error("Failed to reload instance:", err);
+    }
+  }, [instance.id, onUpdateInstance]);
+
   // Fetch system metrics (for settings tab memory configuration)
   useEffect(() => {
     async function fetchSystemMetrics() {
@@ -162,30 +188,82 @@ export function ServerDetailView({ instance, allInstances, onBack, onUpdateInsta
             addMessageRef.current("Server started successfully", "system");
           } else if (event.payload.status === "stopped") {
             addMessageRef.current("Server stopped", "system");
+            setAuthStatus("none");
             setAuthEvent(null);
+            setStartingAuth(false);
           }
         }
       });
       if (isMounted) unlisteners.push(statusUnlisten);
 
+      // Listen for "server needs auth" event (before /auth login is executed)
+      const authNeededUnlisten = await listen<AuthNeededEvent>("server-auth-needed", (event) => {
+        if (isMounted && event.payload.instance_id === instance.id) {
+          setAuthStatus("needs_auth");
+          addMessageRef.current(
+            "Server requires authentication. Click 'Start Authentication' to begin.",
+            "system"
+          );
+        }
+      });
+      if (isMounted) unlisteners.push(authNeededUnlisten);
+
+      // Listen for auth code ready (after /auth login is executed)
       const authUnlisten = await listen<AuthEvent>("server-auth-required", (event) => {
         if (isMounted && event.payload.instance_id === instance.id) {
+          setAuthStatus("awaiting_code");
           setAuthEvent(event.payload);
+          setStartingAuth(false);
           addMessageRef.current(
-            `Authentication required. Code: ${event.payload.code}`,
+            `Authentication code: ${event.payload.code}. Open the auth page to complete.`,
             "system"
           );
         }
       });
       if (isMounted) unlisteners.push(authUnlisten);
 
-      const authSuccessUnlisten = await listen<string>("server-auth-success", (event) => {
-        if (isMounted && event.payload === instance.id) {
+      const authSuccessUnlisten = await listen<AuthSuccessEvent>("server-auth-success", async (event) => {
+        if (isMounted && event.payload.instance_id === instance.id) {
+          setAuthStatus("authenticated");
           setAuthEvent(null);
-          addMessageRef.current("Authentication successful!", "system");
+
+          const profileMsg = event.payload.profile_name
+            ? ` (${event.payload.profile_name})`
+            : "";
+          addMessageRef.current(
+            `Authentication successful${profileMsg}! Server is now fully operational.`,
+            "system"
+          );
+
+          // Save auth status to database and update local state
+          try {
+            await invoke("update_instance_auth_status", {
+              instanceId: instance.id,
+              authStatus: "authenticated",
+              authPersistence: null,
+              authProfileName: event.payload.profile_name,
+            });
+
+            // Update local instance state
+            setInstance((prev) => ({
+              ...prev,
+              auth_status: "authenticated",
+              auth_profile_name: event.payload.profile_name,
+            }));
+          } catch (err) {
+            console.error("Failed to update auth status:", err);
+          }
         }
       });
       if (isMounted) unlisteners.push(authSuccessUnlisten);
+
+      // Listen for persistence warning
+      const persistenceUnlisten = await listen<string>("server-auth-needs-persistence", (event) => {
+        if (isMounted && event.payload === instance.id) {
+          setNeedsPersistence(true);
+        }
+      });
+      if (isMounted) unlisteners.push(persistenceUnlisten);
 
       const exitUnlisten = await listen<string>("server-exit", (event) => {
         if (isMounted && event.payload === instance.id) {
@@ -335,6 +413,56 @@ export function ServerDetailView({ instance, allInstances, onBack, onUpdateInsta
     }
   }
 
+  // Start authentication flow
+  async function handleStartAuth() {
+    setStartingAuth(true);
+    addConsoleMessage("Starting authentication...", "system");
+
+    try {
+      await invoke("send_server_command", {
+        instanceId: instance.id,
+        command: "/auth login device",
+      });
+    } catch (err) {
+      addConsoleMessage(`Failed to start auth: ${err}`, "stderr");
+      setStartingAuth(false);
+    }
+  }
+
+  // Save persistence settings
+  async function handleSavePersistence() {
+    setSavingPersistence(true);
+    addConsoleMessage("Saving credentials with encryption...", "system");
+
+    try {
+      await invoke("send_server_command", {
+        instanceId: instance.id,
+        command: "/auth persistence Encrypted",
+      });
+
+      // Update database
+      await invoke("update_instance_auth_status", {
+        instanceId: instance.id,
+        authStatus: null,
+        authPersistence: "encrypted",
+        authProfileName: null,
+      });
+
+      // Update local instance state
+      setInstance((prev) => ({
+        ...prev,
+        auth_persistence: "encrypted",
+      }));
+
+      setNeedsPersistence(false);
+      addConsoleMessage("Credentials saved! They will persist across restarts.", "system");
+    } catch (err) {
+      addConsoleMessage(`Failed to save persistence: ${err}`, "stderr");
+    } finally {
+      setSavingPersistence(false);
+    }
+  }
+
   // Send command
   async function handleSendCommand(e?: React.FormEvent) {
     e?.preventDefault();
@@ -397,6 +525,16 @@ export function ServerDetailView({ instance, allInstances, onBack, onUpdateInsta
       } catch (fallbackErr) {
         console.error("Fallback also failed:", fallbackErr);
       }
+    }
+  }
+
+  // Open URL in browser
+  async function handleOpenUrl(url: string) {
+    try {
+      const opener = await import("@tauri-apps/plugin-opener");
+      await opener.openUrl(url);
+    } catch (err) {
+      console.error("Failed to open URL:", err);
     }
   }
 
@@ -516,22 +654,85 @@ export function ServerDetailView({ instance, allInstances, onBack, onUpdateInsta
             </div>
           </div>
 
-          {/* Auth Banner */}
-          {authEvent && (
+          {/* Auth Banner - Phase 1: Needs authentication */}
+          {authStatus === "needs_auth" && (
             <div className="mb-3 flex items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
               <div className="flex items-center gap-3">
-                <span className="text-sm text-yellow-500">Authentication required</span>
-                <code className="rounded bg-background/50 px-2 py-0.5 text-sm font-mono">
+                <span className="text-sm text-yellow-500">Server requires authentication</span>
+                <span className="text-xs text-muted-foreground">Players cannot connect until authenticated</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleStartAuth}
+                disabled={startingAuth}
+              >
+                {startingAuth ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                    Start Authentication
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Auth Banner - Phase 2: Waiting for user to enter code */}
+          {authStatus === "awaiting_code" && authEvent && (
+            <div className="mb-3 flex items-center justify-between rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-blue-500">Enter this code:</span>
+                <code className="rounded bg-background/50 px-3 py-1 text-lg font-mono font-bold">
                   {authEvent.code}
                 </code>
               </div>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => window.open(authEvent.auth_url, "_blank")}
+                onClick={() => handleOpenUrl(authEvent.auth_url)}
               >
                 <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                 Open Auth Page
+              </Button>
+            </div>
+          )}
+
+          {/* Auth Banner - Phase 3: Authenticated (briefly shown) */}
+          {authStatus === "authenticated" && !needsPersistence && (
+            <div className="mb-3 flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-green-500">Server authenticated successfully</span>
+                <span className="text-xs text-muted-foreground">Players can now connect</span>
+              </div>
+            </div>
+          )}
+
+          {/* Persistence Warning Banner */}
+          {needsPersistence && (
+            <div className="mb-3 flex items-center justify-between rounded-lg border border-orange-500/30 bg-orange-500/10 p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-orange-500">Credentials in memory only</span>
+                <span className="text-xs text-muted-foreground">Save them to persist across restarts</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSavePersistence}
+                disabled={savingPersistence}
+              >
+                {savingPersistence ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Credentials"
+                )}
               </Button>
             </div>
           )}
@@ -570,8 +771,10 @@ export function ServerDetailView({ instance, allInstances, onBack, onUpdateInsta
               systemMetrics={systemMetrics}
               allInstances={allInstances}
               isSaving={isSavingSettings}
+              isRunning={isRunning}
               onFormChange={(updates) => setSettingsForm((s) => ({ ...s, ...updates }))}
               onSave={handleSaveSettings}
+              onRefreshInstance={reloadInstance}
             />
           </TabsContent>
 

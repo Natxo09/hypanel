@@ -91,6 +91,10 @@ export interface Instance {
   server_args: string | null;
   created_at: string;
   updated_at: string;
+  // Auth fields
+  auth_status: string | null;        // unknown, authenticated, unauthenticated, offline
+  auth_persistence: string | null;   // memory, encrypted
+  auth_profile_name: string | null;  // e.g. "Natxo"
 }
 
 export interface InstanceResult {
@@ -143,6 +147,20 @@ export interface AuthEvent {
   auth_url: string;
   code: string;
 }
+
+export interface AuthNeededEvent {
+  instance_id: string;
+  message: string;
+}
+
+export interface AuthSuccessEvent {
+  instance_id: string;
+  profile_name: string | null;
+  auth_mode: string;  // e.g. "OAUTH_DEVICE"
+}
+
+// Auth state for UI
+export type AuthStatus = "none" | "needs_auth" | "awaiting_code" | "authenticated";
 
 // Metrics types
 export interface ServerMetrics {

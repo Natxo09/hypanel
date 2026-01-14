@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 use crate::database::{self, DbPool, Instance, CreateInstanceInput};
 
@@ -270,4 +270,37 @@ pub async fn check_instance_paths(paths: Vec<(String, String)>) -> Result<Vec<St
         .collect();
 
     Ok(missing)
+}
+
+/// Update instance auth status
+#[tauri::command]
+pub async fn update_instance_auth_status(
+    app: AppHandle,
+    instance_id: String,
+    auth_status: Option<String>,
+    auth_persistence: Option<String>,
+    auth_profile_name: Option<String>,
+) -> Result<bool, ()> {
+    println!(
+        "[update_instance_auth_status] Updating auth for {}: status={:?}, persistence={:?}, profile={:?}",
+        instance_id, auth_status, auth_persistence, auth_profile_name
+    );
+
+    let pool = app.state::<crate::database::DbPool>();
+
+    match crate::database::update_instance_auth(
+        &pool,
+        &instance_id,
+        auth_status,
+        auth_persistence,
+        auth_profile_name,
+    )
+    .await
+    {
+        Ok(updated) => Ok(updated),
+        Err(e) => {
+            println!("[update_instance_auth_status] Error: {}", e);
+            Ok(false)
+        }
+    }
 }

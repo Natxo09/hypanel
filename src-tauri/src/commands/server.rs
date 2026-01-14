@@ -56,6 +56,21 @@ pub struct AuthEvent {
     pub code: String,
 }
 
+/// Emitted when server needs authentication but hasn't started the flow yet
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthNeededEvent {
+    pub instance_id: String,
+    pub message: String,
+}
+
+/// Emitted when authentication is successful
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthSuccessEvent {
+    pub instance_id: String,
+    pub profile_name: Option<String>,
+    pub auth_mode: String,  // e.g. "OAUTH_DEVICE"
+}
+
 // ============================================================================
 // Server State Management
 // ============================================================================
@@ -284,6 +299,9 @@ pub async fn start_server(
     if let Some(stdout) = stdout {
         std::thread::spawn(move || {
             let reader = BufReader::new(stdout);
+            // Track auth profile name across lines
+            let mut last_profile_name: Option<String> = None;
+
             for line in reader.lines() {
                 match line {
                     Ok(text) => {
@@ -295,14 +313,54 @@ pub async fn start_server(
                         };
                         let _ = app_stdout.emit("server-output", &output);
 
-                        // Check for authentication events
+                        // Check if server needs authentication (before /auth login is executed)
+                        if text.contains("No server tokens configured") {
+                            let auth_needed = AuthNeededEvent {
+                                instance_id: instance_id_stdout.clone(),
+                                message: "Server requires authentication. Click 'Start Authentication' to begin.".to_string(),
+                            };
+                            let _ = app_stdout.emit("server-auth-needed", &auth_needed);
+                        }
+
+                        // Check if credentials need persistence
+                        if text.contains("Credentials stored in memory only") {
+                            let _ = app_stdout.emit("server-auth-needs-persistence", &instance_id_stdout);
+                        }
+
+                        // Capture profile name: "Auto-selected profile: Natxo (uuid)"
+                        if text.contains("Auto-selected profile:") {
+                            if let Some(start) = text.find("Auto-selected profile:") {
+                                let after = &text[start + 22..];
+                                // Extract name before the parenthesis
+                                if let Some(paren_pos) = after.find('(') {
+                                    let name = after[..paren_pos].trim().to_string();
+                                    last_profile_name = Some(name);
+                                }
+                            }
+                        }
+
+                        // Check for authentication events (after /auth login is executed)
                         if let Some(auth_event) = parse_auth_event(&instance_id_stdout, &text) {
                             let _ = app_stdout.emit("server-auth-required", &auth_event);
                         }
 
-                        // Check for "Authentication successful"
+                        // Check for "Authentication successful! Mode: XXX"
                         if text.contains("Authentication successful") {
-                            let _ = app_stdout.emit("server-auth-success", &instance_id_stdout);
+                            // Extract auth mode
+                            let auth_mode = if text.contains("Mode:") {
+                                text.split("Mode:").nth(1)
+                                    .map(|s| s.trim().to_string())
+                                    .unwrap_or_else(|| "OAUTH_DEVICE".to_string())
+                            } else {
+                                "OAUTH_DEVICE".to_string()
+                            };
+
+                            let success_event = AuthSuccessEvent {
+                                instance_id: instance_id_stdout.clone(),
+                                profile_name: last_profile_name.clone(),
+                                auth_mode,
+                            };
+                            let _ = app_stdout.emit("server-auth-success", &success_event);
                         }
                     }
                     Err(e) => {
@@ -613,14 +671,38 @@ pub fn send_server_command(
 // Helper Functions
 // ============================================================================
 
+/// Strip ANSI escape codes from a string
+fn strip_ansi_codes(s: &str) -> String {
+    // Simple regex-free ANSI stripper for escape sequences like \x1b[...m
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip until we hit 'm' (end of ANSI color code)
+            while let Some(&next) = chars.peek() {
+                chars.next();
+                if next == 'm' {
+                    break;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 /// Parse authentication event from server output
 fn parse_auth_event(instance_id: &str, line: &str) -> Option<AuthEvent> {
-    // Look for the auth URL pattern
-    // Example: "Or visit: https://accounts.hytale.com/device?user_code=ABCD-1234"
-    if line.contains("accounts.hytale.com/device") {
-        // Try to extract the URL
-        if let Some(url_start) = line.find("https://") {
-            let url_part = &line[url_start..];
+    // Strip ANSI codes first (Hytale server uses colors)
+    let clean_line = strip_ansi_codes(line);
+
+    // Look for the auth URL pattern with user_code in query string
+    // Example: "Or visit: https://oauth.accounts.hytale.com/oauth2/device/verify?user_code=MNkHJhwD"
+    if clean_line.contains("user_code=") && clean_line.contains("https://") {
+        if let Some(url_start) = clean_line.find("https://") {
+            let url_part = &clean_line[url_start..];
             let url_end = url_part.find(|c: char| c.is_whitespace()).unwrap_or(url_part.len());
             let auth_url = url_part[..url_end].to_string();
 
@@ -636,12 +718,13 @@ fn parse_auth_event(instance_id: &str, line: &str) -> Option<AuthEvent> {
         }
     }
 
-    // Also check for "Enter code: XXXX" pattern
-    if line.contains("Enter code:") {
-        if let Some(code_start) = line.find("Enter code:") {
-            let after_code = &line[code_start + 11..];
+    // Also check for "Enter code: XXXX" pattern (backup method)
+    if clean_line.contains("Enter code:") {
+        if let Some(code_start) = clean_line.find("Enter code:") {
+            let after_code = &clean_line[code_start + 11..];
             let code = after_code.trim().split_whitespace().next()?;
-            let auth_url = format!("https://accounts.hytale.com/device?user_code={}", code);
+            // Use the correct OAuth URL
+            let auth_url = format!("https://oauth.accounts.hytale.com/oauth2/device/verify?user_code={}", code);
             return Some(AuthEvent {
                 instance_id: instance_id.to_string(),
                 auth_url,

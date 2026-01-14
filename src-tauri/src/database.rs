@@ -66,6 +66,29 @@ async fn run_migrations(pool: &DbPool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
 
+    // Migration: Add auth columns to instances table
+    // Check if auth_status column exists by trying to select it
+    let has_auth_status = sqlx::query("SELECT auth_status FROM instances LIMIT 1")
+        .fetch_optional(pool)
+        .await
+        .is_ok();
+
+    if !has_auth_status {
+        println!("[database] Adding auth columns to instances table...");
+
+        sqlx::query("ALTER TABLE instances ADD COLUMN auth_status TEXT DEFAULT 'unknown'")
+            .execute(pool)
+            .await?;
+
+        sqlx::query("ALTER TABLE instances ADD COLUMN auth_persistence TEXT DEFAULT 'memory'")
+            .execute(pool)
+            .await?;
+
+        sqlx::query("ALTER TABLE instances ADD COLUMN auth_profile_name TEXT")
+            .execute(pool)
+            .await?;
+    }
+
     println!("[database] Migrations completed");
 
     Ok(())
@@ -88,6 +111,10 @@ pub struct Instance {
     pub server_args: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    // Auth fields
+    pub auth_status: Option<String>,        // unknown, authenticated, unauthenticated, offline
+    pub auth_persistence: Option<String>,   // memory, encrypted
+    pub auth_profile_name: Option<String>,  // e.g. "Natxo"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -126,6 +153,9 @@ pub async fn create_instance(pool: &DbPool, input: CreateInstanceInput) -> Resul
         server_args: None,
         created_at: now.clone(),
         updated_at: now,
+        auth_status: Some("unknown".to_string()),
+        auth_persistence: Some("memory".to_string()),
+        auth_profile_name: None,
     })
 }
 
@@ -133,7 +163,8 @@ pub async fn create_instance(pool: &DbPool, input: CreateInstanceInput) -> Resul
 pub async fn get_all_instances(pool: &DbPool) -> Result<Vec<Instance>, sqlx::Error> {
     let instances = sqlx::query_as::<_, Instance>(
         r#"
-        SELECT id, name, path, java_path, jvm_args, server_args, created_at, updated_at
+        SELECT id, name, path, java_path, jvm_args, server_args, created_at, updated_at,
+               auth_status, auth_persistence, auth_profile_name
         FROM instances
         ORDER BY created_at DESC
         "#
@@ -148,7 +179,8 @@ pub async fn get_all_instances(pool: &DbPool) -> Result<Vec<Instance>, sqlx::Err
 pub async fn get_instance_by_id(pool: &DbPool, id: &str) -> Result<Option<Instance>, sqlx::Error> {
     let instance = sqlx::query_as::<_, Instance>(
         r#"
-        SELECT id, name, path, java_path, jvm_args, server_args, created_at, updated_at
+        SELECT id, name, path, java_path, jvm_args, server_args, created_at, updated_at,
+               auth_status, auth_persistence, auth_profile_name
         FROM instances
         WHERE id = ?
         "#
@@ -164,7 +196,8 @@ pub async fn get_instance_by_id(pool: &DbPool, id: &str) -> Result<Option<Instan
 pub async fn get_instance_by_path(pool: &DbPool, path: &str) -> Result<Option<Instance>, sqlx::Error> {
     let instance = sqlx::query_as::<_, Instance>(
         r#"
-        SELECT id, name, path, java_path, jvm_args, server_args, created_at, updated_at
+        SELECT id, name, path, java_path, jvm_args, server_args, created_at, updated_at,
+               auth_status, auth_persistence, auth_profile_name
         FROM instances
         WHERE path = ?
         "#
@@ -216,6 +249,48 @@ pub async fn update_instance(
     if let Some(sa) = server_args {
         updates.push("server_args = ?");
         values.push(sa);
+    }
+
+    let query = format!(
+        "UPDATE instances SET {} WHERE id = ?",
+        updates.join(", ")
+    );
+
+    let mut q = sqlx::query(&query);
+    for v in values {
+        q = q.bind(v);
+    }
+    q = q.bind(id);
+
+    let result = q.execute(pool).await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+/// Update instance auth status
+pub async fn update_instance_auth(
+    pool: &DbPool,
+    id: &str,
+    auth_status: Option<String>,
+    auth_persistence: Option<String>,
+    auth_profile_name: Option<String>,
+) -> Result<bool, sqlx::Error> {
+    let now = Utc::now().to_rfc3339();
+
+    let mut updates = vec!["updated_at = ?"];
+    let mut values: Vec<Option<String>> = vec![Some(now)];
+
+    if auth_status.is_some() {
+        updates.push("auth_status = ?");
+        values.push(auth_status);
+    }
+    if auth_persistence.is_some() {
+        updates.push("auth_persistence = ?");
+        values.push(auth_persistence);
+    }
+    if auth_profile_name.is_some() {
+        updates.push("auth_profile_name = ?");
+        values.push(auth_profile_name);
     }
 
     let query = format!(

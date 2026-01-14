@@ -10,6 +10,7 @@ use commands::{
     create_server_instance, delete_server_instance, download_server_files, get_downloader_info,
     get_downloader_version, get_server_instance, get_server_instances, get_system_paths,
     install_downloader_cli, is_onboarding_complete, update_server_instance, validate_server_files,
+    update_instance_auth_status,
     // Server management
     start_server, stop_server, get_server_status, get_all_server_statuses, send_server_command,
     ServerState,
@@ -73,6 +74,7 @@ pub fn run() {
             delete_server_instance,
             update_server_instance,
             check_instance_paths,
+            update_instance_auth_status,
             // Onboarding
             is_onboarding_complete,
             complete_onboarding,
