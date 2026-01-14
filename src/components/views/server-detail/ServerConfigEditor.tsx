@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -233,122 +232,114 @@ export function ServerConfigEditor({ instancePath, isRunning }: ServerConfigEdit
       ) : (
         <div className="space-y-4">
           {/* Basic Settings */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Basic Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="server-name">Server Name</Label>
-                  <Input
-                    id="server-name"
-                    value={config?.ServerName || ""}
-                    onChange={(e) => updateConfig({ ServerName: e.target.value })}
-                    disabled={isRunning}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="motd">MOTD</Label>
-                  <Input
-                    id="motd"
-                    value={config?.MOTD || ""}
-                    onChange={(e) => updateConfig({ MOTD: e.target.value })}
-                    placeholder="Message of the day..."
-                    disabled={isRunning}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="max-players">Max Players</Label>
-                  <Input
-                    id="max-players"
-                    type="number"
-                    value={config?.MaxPlayers || 100}
-                    onChange={(e) => updateConfig({ MaxPlayers: parseInt(e.target.value) || 100 })}
-                    min={1}
-                    max={1000}
-                    disabled={isRunning}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="max-view-radius">Max View Radius</Label>
-                  <Input
-                    id="max-view-radius"
-                    type="number"
-                    value={config?.MaxViewRadius || 32}
-                    onChange={(e) => updateConfig({ MaxViewRadius: parseInt(e.target.value) || 32 })}
-                    min={1}
-                    max={64}
-                    disabled={isRunning}
-                  />
-                </div>
-              </div>
-
+          <div className="rounded-lg border bg-card p-4 space-y-4">
+            <h3 className="text-sm font-medium">Basic Settings</h3>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="password">Server Password</Label>
+                <Label htmlFor="server-name">Server Name</Label>
                 <Input
-                  id="password"
-                  type="password"
-                  value={config?.Password || ""}
-                  onChange={(e) => updateConfig({ Password: e.target.value })}
-                  placeholder="Leave empty for no password"
+                  id="server-name"
+                  value={config?.ServerName || ""}
+                  onChange={(e) => updateConfig({ ServerName: e.target.value })}
                   disabled={isRunning}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="motd">MOTD</Label>
+                <Input
+                  id="motd"
+                  value={config?.MOTD || ""}
+                  onChange={(e) => updateConfig({ MOTD: e.target.value })}
+                  placeholder="Message of the day..."
+                  disabled={isRunning}
+                />
+              </div>
+            </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Local Compression</Label>
-                  <p className="text-xs text-muted-foreground">Enable local network compression</p>
-                </div>
-                <Switch
-                  checked={config?.LocalCompressionEnabled ?? false}
-                  onCheckedChange={(checked) => updateConfig({ LocalCompressionEnabled: checked })}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="max-players">Max Players</Label>
+                <Input
+                  id="max-players"
+                  type="number"
+                  value={config?.MaxPlayers || 100}
+                  onChange={(e) => updateConfig({ MaxPlayers: parseInt(e.target.value) || 100 })}
+                  min={1}
+                  max={1000}
                   disabled={isRunning}
                 />
               </div>
-            </CardContent>
-          </Card>
+              <div className="space-y-2">
+                <Label htmlFor="max-view-radius">Max View Radius</Label>
+                <Input
+                  id="max-view-radius"
+                  type="number"
+                  value={config?.MaxViewRadius || 32}
+                  onChange={(e) => updateConfig({ MaxViewRadius: parseInt(e.target.value) || 32 })}
+                  min={1}
+                  max={64}
+                  disabled={isRunning}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Server Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={config?.Password || ""}
+                onChange={(e) => updateConfig({ Password: e.target.value })}
+                placeholder="Leave empty for no password"
+                disabled={isRunning}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Local Compression</Label>
+                <p className="text-xs text-muted-foreground">Enable local network compression</p>
+              </div>
+              <Switch
+                checked={config?.LocalCompressionEnabled ?? false}
+                onCheckedChange={(checked) => updateConfig({ LocalCompressionEnabled: checked })}
+                disabled={isRunning}
+              />
+            </div>
+          </div>
 
           {/* Defaults */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Defaults</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="default-world">Default World</Label>
-                  <Input
-                    id="default-world"
-                    value={config?.Defaults?.World || "default"}
-                    onChange={(e) => updateDefaults({ World: e.target.value })}
-                    disabled={isRunning}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="default-gamemode">Default Game Mode</Label>
-                  <Select
-                    value={config?.Defaults?.GameMode || "Adventure"}
-                    onValueChange={(value) => updateDefaults({ GameMode: value })}
-                    disabled={isRunning}
-                  >
-                    <SelectTrigger id="default-gamemode">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Adventure">Adventure</SelectItem>
-                      <SelectItem value="Creative">Creative</SelectItem>
-                      <SelectItem value="Survival">Survival</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          <div className="rounded-lg border bg-card p-4 space-y-4">
+            <h3 className="text-sm font-medium">Defaults</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="default-world">Default World</Label>
+                <Input
+                  id="default-world"
+                  value={config?.Defaults?.World || "default"}
+                  onChange={(e) => updateDefaults({ World: e.target.value })}
+                  disabled={isRunning}
+                />
               </div>
-            </CardContent>
-          </Card>
+              <div className="space-y-2">
+                <Label htmlFor="default-gamemode">Default Game Mode</Label>
+                <Select
+                  value={config?.Defaults?.GameMode || "Adventure"}
+                  onValueChange={(value) => updateDefaults({ GameMode: value })}
+                  disabled={isRunning}
+                >
+                  <SelectTrigger id="default-gamemode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Adventure">Adventure</SelectItem>
+                    <SelectItem value="Creative">Creative</SelectItem>
+                    <SelectItem value="Survival">Survival</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
 
           {/* Tip for advanced settings */}
           <p className="text-xs text-muted-foreground text-center py-2">

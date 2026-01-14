@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { JsonEditor } from "@/components/ui/json-editor";
 import type { WorldConfig, WorldConfigResult, JsonWriteResult } from "@/lib/types";
@@ -247,87 +246,75 @@ export function WorldConfigEditor({ worldPath, isRunning }: WorldConfigEditorPro
       ) : (
         <div className="space-y-4">
           {/* World Info (Read-only) */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">World Info</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Seed</Label>
-                  <Input
-                    value={config?.Seed?.toString() || ""}
-                    readOnly
-                    className="font-mono text-sm bg-muted/50"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">WorldGen Type</Label>
-                  <Input
-                    value={config?.WorldGen?.Type || ""}
-                    readOnly
-                    className="text-sm bg-muted/50"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">WorldGen Name</Label>
-                  <Input
-                    value={config?.WorldGen?.Name || ""}
-                    readOnly
-                    className="text-sm bg-muted/50"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Gameplay Config */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Gameplay</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="text-sm font-medium">World Info</h3>
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Gameplay Config Preset</Label>
+                <Label className="text-xs text-muted-foreground">Seed</Label>
                 <Input
-                  value={config?.GameplayConfig || "Default"}
-                  onChange={(e) => {
-                    if (!config) return;
-                    const updated = { ...config, GameplayConfig: e.target.value };
-                    setConfig(updated);
-                    setRawJson(JSON.stringify(updated, null, 2));
-                    setHasChanges(true);
-                  }}
-                  disabled={isRunning}
-                  className="text-sm"
+                  value={config?.Seed?.toString() || ""}
+                  readOnly
+                  className="font-mono text-sm bg-muted/50"
                 />
               </div>
-            </CardContent>
-          </Card>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">WorldGen Type</Label>
+                <Input
+                  value={config?.WorldGen?.Type || ""}
+                  readOnly
+                  className="text-sm bg-muted/50"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">WorldGen Name</Label>
+                <Input
+                  value={config?.WorldGen?.Name || ""}
+                  readOnly
+                  className="text-sm bg-muted/50"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Gameplay Config */}
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="text-sm font-medium">Gameplay</h3>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Gameplay Config Preset</Label>
+              <Input
+                value={config?.GameplayConfig || "Default"}
+                onChange={(e) => {
+                  if (!config) return;
+                  const updated = { ...config, GameplayConfig: e.target.value };
+                  setConfig(updated);
+                  setRawJson(JSON.stringify(updated, null, 2));
+                  setHasChanges(true);
+                }}
+                disabled={isRunning}
+                className="text-sm"
+              />
+            </div>
+          </div>
 
           {/* Toggle Settings */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">World Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                {TOGGLE_FIELDS.map((field) => (
-                  <div key={field.key} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
-                    <div>
-                      <Label className="text-sm">{field.label}</Label>
-                      <p className="text-xs text-muted-foreground">{field.description}</p>
-                    </div>
-                    <Switch
-                      checked={(config?.[field.key] as boolean) ?? false}
-                      onCheckedChange={(checked) => updateToggle(field.key, checked)}
-                      disabled={isRunning}
-                    />
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="text-sm font-medium">World Settings</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {TOGGLE_FIELDS.map((field) => (
+                <div key={field.key} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                  <div>
+                    <Label className="text-sm">{field.label}</Label>
+                    <p className="text-xs text-muted-foreground">{field.description}</p>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <Switch
+                    checked={(config?.[field.key] as boolean) ?? false}
+                    onCheckedChange={(checked) => updateToggle(field.key, checked)}
+                    disabled={isRunning}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

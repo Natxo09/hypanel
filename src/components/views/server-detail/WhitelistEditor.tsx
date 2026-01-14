@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JsonEditor } from "@/components/ui/json-editor";
 import type { Whitelist, WhitelistResult, JsonWriteResult } from "@/lib/types";
 
@@ -286,89 +285,79 @@ export function WhitelistEditor({ instancePath, isRunning }: WhitelistEditorProp
         /* Form View */
         <div className="space-y-4">
           {/* Enable toggle */}
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="whitelist-enabled" className="text-sm font-medium">
-                    Whitelist Enabled
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Only players in the whitelist can join the server
-                  </p>
-                </div>
-                <Switch
-                  id="whitelist-enabled"
-                  checked={whitelist?.enabled ?? false}
-                  onCheckedChange={handleToggleEnabled}
-                  disabled={isRunning}
-                />
+          <div className="rounded-lg border bg-card p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="whitelist-enabled" className="text-sm font-medium">
+                  Whitelist Enabled
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Only players in the whitelist can join the server
+                </p>
               </div>
-            </CardContent>
-          </Card>
+              <Switch
+                id="whitelist-enabled"
+                checked={whitelist?.enabled ?? false}
+                onCheckedChange={handleToggleEnabled}
+                disabled={isRunning}
+              />
+            </div>
+          </div>
 
           {/* Add player */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Add Player</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter player UUID..."
-                  value={newUuid}
-                  onChange={(e) => setNewUuid(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddUuid()}
-                  className="font-mono text-sm"
-                  disabled={isRunning}
-                />
-                <Button
-                  onClick={handleAddUuid}
-                  disabled={!newUuid.trim() || isRunning}
-                  size="sm"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="text-sm font-medium">Add Player</h3>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter player UUID..."
+                value={newUuid}
+                onChange={(e) => setNewUuid(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddUuid()}
+                className="font-mono text-sm"
+                disabled={isRunning}
+              />
+              <Button
+                onClick={handleAddUuid}
+                disabled={!newUuid.trim() || isRunning}
+                size="sm"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add
+              </Button>
+            </div>
+          </div>
 
           {/* Whitelist entries */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">
-                Whitelisted Players ({whitelist?.list.length ?? 0})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {whitelist?.list.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  No players in whitelist
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {whitelist?.list.map((uuid) => (
-                    <div
-                      key={uuid}
-                      className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="text-sm font-medium">
+              Whitelisted Players ({whitelist?.list.length ?? 0})
+            </h3>
+            {whitelist?.list.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No players in whitelist
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {whitelist?.list.map((uuid) => (
+                  <div
+                    key={uuid}
+                    className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+                  >
+                    <code className="text-sm font-mono">{uuid}</code>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveUuid(uuid)}
+                      disabled={isRunning}
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                     >
-                      <code className="text-sm font-mono">{uuid}</code>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveUuid(uuid)}
-                        disabled={isRunning}
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JsonEditor } from "@/components/ui/json-editor";
 import type { Ban, BansResult, JsonWriteResult } from "@/lib/types";
 
@@ -252,92 +251,84 @@ export function BansEditor({ instancePath, isRunning }: BansEditorProps) {
       ) : (
         <div className="space-y-4">
           {/* Add ban form */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Ban Player</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="text-sm font-medium">Ban Player</h3>
+            <Input
+              placeholder="Player UUID..."
+              value={newUuid}
+              onChange={(e) => setNewUuid(e.target.value)}
+              className="font-mono text-sm"
+              disabled={isRunning}
+            />
+            <div className="flex gap-2">
               <Input
-                placeholder="Player UUID..."
-                value={newUuid}
-                onChange={(e) => setNewUuid(e.target.value)}
-                className="font-mono text-sm"
+                placeholder="Reason (optional)..."
+                value={newReason}
+                onChange={(e) => setNewReason(e.target.value)}
                 disabled={isRunning}
               />
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Reason (optional)..."
-                  value={newReason}
-                  onChange={(e) => setNewReason(e.target.value)}
-                  disabled={isRunning}
-                />
-                <Button onClick={handleAddBan} disabled={!newUuid.trim() || isRunning} size="sm">
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Ban
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              <Button onClick={handleAddBan} disabled={!newUuid.trim() || isRunning} size="sm">
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Ban
+              </Button>
+            </div>
+          </div>
 
           {/* Search and list */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">
-                  Banned Players ({bans.length})
-                </CardTitle>
-                <div className="relative w-48">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8 h-8 text-sm"
-                  />
-                </div>
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">
+                Banned Players ({bans.length})
+              </h3>
+              <div className="relative w-48">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
               </div>
-            </CardHeader>
-            <CardContent>
-              {filteredBans.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  {bans.length === 0 ? "No banned players" : "No results found"}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {filteredBans.map((ban) => (
-                    <div
-                      key={ban.uuid}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <code className="text-sm font-mono block truncate">{ban.uuid}</code>
-                        {ban.reason && (
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                            Reason: {ban.reason}
-                          </p>
-                        )}
-                        {ban.bannedAt && (
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(ban.bannedAt).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveBan(ban.uuid)}
-                        disabled={isRunning}
-                        className="h-7 px-2 text-muted-foreground hover:text-destructive shrink-0"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-1" />
-                        Unban
-                      </Button>
+            </div>
+            {filteredBans.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                {bans.length === 0 ? "No banned players" : "No results found"}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {filteredBans.map((ban) => (
+                  <div
+                    key={ban.uuid}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <code className="text-sm font-mono block truncate">{ban.uuid}</code>
+                      {ban.reason && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          Reason: {ban.reason}
+                        </p>
+                      )}
+                      {ban.bannedAt && (
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(ban.bannedAt).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveBan(ban.uuid)}
+                      disabled={isRunning}
+                      className="h-7 px-2 text-muted-foreground hover:text-destructive shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      Unban
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

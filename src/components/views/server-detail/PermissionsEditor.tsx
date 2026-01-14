@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { JsonEditor } from "@/components/ui/json-editor";
 import type { Permissions, PermissionsResult, JsonWriteResult } from "@/lib/types";
@@ -292,148 +291,138 @@ export function PermissionsEditor({ instancePath, isRunning }: PermissionsEditor
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {/* Groups */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Groups ({groupNames.length})
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="New group name..."
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  disabled={isRunning}
-                  className="text-sm"
-                />
-                <Button onClick={handleAddGroup} disabled={!newGroupName.trim() || isRunning} size="sm">
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Groups ({groupNames.length})
+            </h3>
+            <div className="flex gap-2">
+              <Input
+                placeholder="New group name..."
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                disabled={isRunning}
+                className="text-sm"
+              />
+              <Button onClick={handleAddGroup} disabled={!newGroupName.trim() || isRunning} size="sm">
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
 
-              <div className="space-y-1">
-                {groupNames.map((name) => (
-                  <div
-                    key={name}
-                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
-                      selectedGroup === name ? "bg-primary/10 border border-primary/30" : "bg-muted/50 hover:bg-muted"
-                    }`}
-                    onClick={() => setSelectedGroup(selectedGroup === name ? null : name)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{name}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {permissions?.groups[name]?.length || 0} perms
-                      </Badge>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveGroup(name);
-                      }}
-                      disabled={isRunning || name === "Default" || name === "OP"}
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+            <div className="space-y-1">
+              {groupNames.map((name) => (
+                <div
+                  key={name}
+                  className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+                    selectedGroup === name ? "bg-primary/10 border border-primary/30" : "bg-muted/50 hover:bg-muted"
+                  }`}
+                  onClick={() => setSelectedGroup(selectedGroup === name ? null : name)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{name}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {permissions?.groups[name]?.length || 0} perms
+                    </Badge>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveGroup(name);
+                    }}
+                    disabled={isRunning || name === "Default" || name === "OP"}
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* Group Permissions / Users */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                {selectedGroup ? (
-                  <>
-                    <Shield className="h-4 w-4" />
-                    {selectedGroup} Permissions
-                  </>
-                ) : (
-                  <>
-                    <Users className="h-4 w-4" />
-                    Users ({userCount})
-                  </>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="text-sm font-medium flex items-center gap-2">
               {selectedGroup ? (
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add permission (e.g., command.kick)..."
-                      value={newGroupPermission}
-                      onChange={(e) => setNewGroupPermission(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAddPermissionToGroup(selectedGroup)}
-                      disabled={isRunning}
-                      className="text-sm font-mono"
-                    />
-                    <Button
-                      onClick={() => handleAddPermissionToGroup(selectedGroup)}
-                      disabled={!newGroupPermission.trim() || isRunning}
-                      size="sm"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-
-                  <div className="space-y-1 max-h-48 overflow-auto">
-                    {permissions?.groups[selectedGroup]?.map((perm) => (
-                      <div
-                        key={perm}
-                        className="flex items-center justify-between p-2 rounded bg-muted/50"
-                      >
-                        <code className="text-xs font-mono">{perm}</code>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemovePermissionFromGroup(selectedGroup, perm)}
-                          disabled={isRunning}
-                          className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                    {(!permissions?.groups[selectedGroup] || permissions.groups[selectedGroup].length === 0) && (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        No permissions in this group
-                      </p>
-                    )}
-                  </div>
-                </div>
+                <>
+                  <Shield className="h-4 w-4" />
+                  {selectedGroup} Permissions
+                </>
               ) : (
-                <div className="space-y-2">
-                  {Object.entries(permissions?.users || {}).map(([uuid, data]) => (
-                    <div key={uuid} className="p-2 rounded-lg bg-muted/50">
-                      <code className="text-xs font-mono block truncate">{uuid}</code>
-                      <div className="flex gap-1 mt-1 flex-wrap">
-                        {data.groups.map((g) => (
-                          <Badge key={g} variant="outline" className="text-xs">
-                            {g}
-                          </Badge>
-                        ))}
-                      </div>
+                <>
+                  <Users className="h-4 w-4" />
+                  Users ({userCount})
+                </>
+              )}
+            </h3>
+            {selectedGroup ? (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add permission (e.g., command.kick)..."
+                    value={newGroupPermission}
+                    onChange={(e) => setNewGroupPermission(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAddPermissionToGroup(selectedGroup)}
+                    disabled={isRunning}
+                    className="text-sm font-mono"
+                  />
+                  <Button
+                    onClick={() => handleAddPermissionToGroup(selectedGroup)}
+                    disabled={!newGroupPermission.trim() || isRunning}
+                    size="sm"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+
+                <div className="space-y-1 max-h-48 overflow-auto">
+                  {permissions?.groups[selectedGroup]?.map((perm) => (
+                    <div
+                      key={perm}
+                      className="flex items-center justify-between p-2 rounded bg-muted/50"
+                    >
+                      <code className="text-xs font-mono">{perm}</code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemovePermissionFromGroup(selectedGroup, perm)}
+                        disabled={isRunning}
+                        className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
                   ))}
-                  {userCount === 0 && (
+                  {(!permissions?.groups[selectedGroup] || permissions.groups[selectedGroup].length === 0) && (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      No users with custom permissions
+                      No permissions in this group
                     </p>
                   )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {Object.entries(permissions?.users || {}).map(([uuid, data]) => (
+                  <div key={uuid} className="p-2 rounded-lg bg-muted/50">
+                    <code className="text-xs font-mono block truncate">{uuid}</code>
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {data.groups.map((g) => (
+                        <Badge key={g} variant="outline" className="text-xs">
+                          {g}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {userCount === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No users with custom permissions
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
