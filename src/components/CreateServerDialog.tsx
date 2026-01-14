@@ -54,6 +54,11 @@ function normalizePath(path: string): string {
   return path.toLowerCase().replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
+// Check if running on macOS (CLI download not supported)
+function isMacOS(): boolean {
+  return navigator.platform.toLowerCase().includes("mac");
+}
+
 // Extract port from server_args
 function extractPort(serverArgs: string | null): number {
   if (!serverArgs) return 5520;
@@ -435,13 +440,16 @@ export function CreateServerDialog({
               </div>
             </button>
 
-            {/* Download with CLI */}
+            {/* Download with CLI - Not available on macOS */}
             <button
-              onClick={() => setSelectedSource("download")}
+              onClick={() => !isMacOS() && setSelectedSource("download")}
+              disabled={isMacOS()}
               className={`w-full p-3 rounded-lg border text-left transition-colors ${
-                selectedSource === "download"
-                  ? "border-primary bg-primary/5"
-                  : "hover:border-muted-foreground/50"
+                isMacOS()
+                  ? "opacity-50 cursor-not-allowed"
+                  : selectedSource === "download"
+                    ? "border-primary bg-primary/5"
+                    : "hover:border-muted-foreground/50"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -449,20 +457,40 @@ export function CreateServerDialog({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium">Download from Hytale</p>
-                    {downloader?.available && <Badge variant="secondary" className="text-xs">CLI Ready</Badge>}
+                    {isMacOS() ? (
+                      <Badge variant="destructive" className="text-xs">Not available</Badge>
+                    ) : (
+                      downloader?.available && <Badge variant="secondary" className="text-xs">CLI Ready</Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {downloader?.available ? "Download using hytale-downloader" : "Will install CLI automatically"}
+                    {isMacOS()
+                      ? "Not available on macOS"
+                      : downloader?.available
+                        ? "Download using hytale-downloader"
+                        : "Will install CLI automatically"}
                   </p>
                 </div>
-                {selectedSource === "download" && (
+                {selectedSource === "download" && !isMacOS() && (
                   <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
                 )}
               </div>
             </button>
 
-            {/* CLI not available - install prompt */}
-            {selectedSource === "download" && !downloader?.available && (
+            {/* macOS warning */}
+            {isMacOS() && (
+              <div className="p-3 rounded-lg border bg-yellow-500/10 border-yellow-500/20">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-yellow-500">
+                    The hytale-downloader CLI is not available for macOS. Please copy files from your Hytale Launcher installation instead.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* CLI not available - install prompt (only shown when not on macOS) */}
+            {selectedSource === "download" && !downloader?.available && !isMacOS() && (
               <div className="p-3 rounded-lg border bg-muted/50 space-y-2">
                 <p className="text-sm">hytale-downloader CLI is required</p>
                 <Button
