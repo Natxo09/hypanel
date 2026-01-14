@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
