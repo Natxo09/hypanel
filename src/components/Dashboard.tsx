@@ -19,6 +19,7 @@ export function Dashboard() {
   const [currentView, setCurrentView] = useState<View>("home");
   const [selectedInstance, setSelectedInstance] = useState<Instance | null>(null);
   const [serverStatuses, setServerStatuses] = useState<Map<string, string>>(new Map());
+  const [missingFolders, setMissingFolders] = useState<Set<string>>(new Set());
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   // Load instances
@@ -54,6 +55,12 @@ export function Dashboard() {
       const result = await invoke<InstancesListResult>("get_server_instances");
       if (result.success) {
         setInstances(result.instances);
+        // Check which folders are missing
+        if (result.instances.length > 0) {
+          const paths = result.instances.map((i) => [i.id, i.path] as [string, string]);
+          const missing = await invoke<string[]>("check_instance_paths", { paths });
+          setMissingFolders(new Set(missing));
+        }
       } else {
         setError(result.error || "Failed to load instances");
       }
@@ -98,6 +105,20 @@ export function Dashboard() {
     setCurrentView("server");
   }
 
+  function handleDeleteInstance(instanceId: string) {
+    setInstances((prev) => prev.filter((i) => i.id !== instanceId));
+    setMissingFolders((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(instanceId);
+      return newSet;
+    });
+    // If we were viewing this server, go back to servers list
+    if (selectedInstance?.id === instanceId) {
+      setSelectedInstance(null);
+      setCurrentView("servers");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col h-screen bg-background">
@@ -126,6 +147,7 @@ export function Dashboard() {
             <HomeView
               instances={instances}
               serverStatuses={serverStatuses}
+              missingFolders={missingFolders}
               onSelectInstance={handleSelectInstance}
               onAddInstance={handleAddInstance}
               onViewAllServers={() => setCurrentView("servers")}
@@ -136,8 +158,10 @@ export function Dashboard() {
             <ServersView
               instances={instances}
               serverStatuses={serverStatuses}
+              missingFolders={missingFolders}
               onSelectInstance={handleSelectInstance}
               onAddInstance={handleAddInstance}
+              onDeleteInstance={handleDeleteInstance}
             />
           )}
 

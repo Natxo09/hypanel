@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Server, Plus, Play, Square, Loader2 } from "lucide-react";
+import { Server, Plus, Play, Square, Loader2, MoreHorizontal, Trash2, FolderOpen, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -10,24 +10,38 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { DeleteServerDialog } from "@/components/DeleteServerDialog";
 import type { Instance, StartResult, StopResult, ServerMetrics } from "@/lib/types";
 
 interface ServersViewProps {
   instances: Instance[];
   serverStatuses: Map<string, string>;
+  missingFolders: Set<string>;
   onSelectInstance: (instance: Instance) => void;
   onAddInstance: () => void;
+  onDeleteInstance: (instanceId: string) => void;
 }
 
 export function ServersView({
   instances,
   serverStatuses,
+  missingFolders,
   onSelectInstance,
   onAddInstance,
+  onDeleteInstance,
 }: ServersViewProps) {
   const [serverMetrics, setServerMetrics] = useState<Map<string, ServerMetrics>>(new Map());
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [instanceToDelete, setInstanceToDelete] = useState<Instance | null>(null);
 
   // Fetch metrics for running servers
   useEffect(() => {
@@ -146,27 +160,41 @@ export function ServersView({
                     status === "starting" ||
                     status === "stopping";
                   const metrics = serverMetrics.get(instance.id);
+                  const isMissing = missingFolders.has(instance.id);
 
                   return (
                     <TableRow
                       key={instance.id}
-                      className="cursor-pointer"
-                      onClick={() => onSelectInstance(instance)}
+                      className={isMissing ? "opacity-75" : "cursor-pointer"}
+                      onClick={() => !isMissing && onSelectInstance(instance)}
                     >
                       <TableCell className="py-2 px-3">
                         <div className="flex items-center gap-2.5">
                           <div
                             className={`flex h-7 w-7 items-center justify-center rounded-md ${
-                              isRunning ? "bg-green-500/10" : "bg-muted"
+                              isMissing
+                                ? "bg-yellow-500/10"
+                                : isRunning
+                                  ? "bg-green-500/10"
+                                  : "bg-muted"
                             }`}
                           >
                             <Server
                               className={`h-3.5 w-3.5 ${
-                                isRunning ? "text-green-500" : "text-muted-foreground"
+                                isMissing
+                                  ? "text-yellow-500"
+                                  : isRunning
+                                    ? "text-green-500"
+                                    : "text-muted-foreground"
                               }`}
                             />
                           </div>
-                          <span className="text-sm font-medium">{instance.name}</span>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{instance.name}</span>
+                            {isMissing && (
+                              <span className="text-[10px] text-yellow-500">Folder missing</span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="py-2 px-3">
@@ -201,29 +229,78 @@ export function ServersView({
                         </span>
                       </TableCell>
                       <TableCell className="py-2 px-3 text-right">
-                        {isLoading ? (
-                          <Button size="icon" variant="ghost" className="h-7 w-7" disabled>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          </Button>
-                        ) : isRunning ? (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            onClick={(e) => handleStop(e, instance)}
-                          >
-                            <Square className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-green-500"
-                            onClick={(e) => handleStart(e, instance)}
-                          >
-                            <Play className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
+                        <div className="flex items-center justify-end gap-1">
+                          {!isMissing && (
+                            isLoading ? (
+                              <Button size="icon" variant="ghost" className="h-7 w-7" disabled>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              </Button>
+                            ) : isRunning ? (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => handleStop(e, instance)}
+                              >
+                                <Square className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-green-500"
+                                onClick={(e) => handleStart(e, instance)}
+                              >
+                                <Play className="h-3.5 w-3.5" />
+                              </Button>
+                            )
+                          )}
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {!isMissing && (
+                                <>
+                                  <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    onSelectInstance(instance);
+                                  }}>
+                                    <Settings className="h-4 w-4" />
+                                    Settings
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    invoke("open_folder", { path: instance.path });
+                                  }}>
+                                    <FolderOpen className="h-4 w-4" />
+                                    Open folder
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInstanceToDelete(instance);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                {isMissing ? "Remove from list" : "Delete"}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -233,6 +310,14 @@ export function ServersView({
           </div>
         )}
       </div>
+
+      <DeleteServerDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        instance={instanceToDelete}
+        onDeleted={onDeleteInstance}
+        folderMissing={instanceToDelete ? missingFolders.has(instanceToDelete.id) : false}
+      />
     </div>
   );
 }

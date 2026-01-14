@@ -19,6 +19,7 @@ import type { Instance, SystemMetrics, ServerMetrics } from "@/lib/types";
 interface HomeViewProps {
   instances: Instance[];
   serverStatuses: Map<string, string>;
+  missingFolders: Set<string>;
   onSelectInstance: (instance: Instance) => void;
   onAddInstance: () => void;
   onViewAllServers: () => void;
@@ -33,6 +34,7 @@ interface MetricDataPoint {
 export function HomeView({
   instances,
   serverStatuses,
+  missingFolders,
   onSelectInstance,
   onAddInstance,
   onViewAllServers,
@@ -285,34 +287,55 @@ export function HomeView({
               {instances.slice(0, 6).map((instance) => {
                 const status = getInstanceStatus(instance.id);
                 const isRunning = status === "running";
+                const isMissing = missingFolders.has(instance.id);
 
                 return (
                   <div
                     key={instance.id}
-                    className="cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50"
-                    onClick={() => onSelectInstance(instance)}
+                    className={`rounded-lg border bg-card p-3 transition-colors ${
+                      isMissing
+                        ? "opacity-75 border-yellow-500/30"
+                        : "cursor-pointer hover:bg-muted/50"
+                    }`}
+                    onClick={() => !isMissing && onSelectInstance(instance)}
                   >
                     <div className="flex items-center gap-2.5">
                       <div
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
-                          isRunning ? "bg-green-500/10" : "bg-muted"
+                          isMissing
+                            ? "bg-yellow-500/10"
+                            : isRunning
+                              ? "bg-green-500/10"
+                              : "bg-muted"
                         }`}
                       >
                         <Server
                           className={`h-4 w-4 ${
-                            isRunning ? "text-green-500" : "text-muted-foreground"
+                            isMissing
+                              ? "text-yellow-500"
+                              : isRunning
+                                ? "text-green-500"
+                                : "text-muted-foreground"
                           }`}
                         />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{instance.name}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">
-                          {instance.path}
-                        </p>
+                        {isMissing ? (
+                          <p className="text-[11px] text-yellow-500">Folder missing</p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {instance.path}
+                          </p>
+                        )}
                       </div>
                       <span
                         className={`h-2 w-2 rounded-full ${
-                          isRunning ? "bg-green-500" : "bg-muted-foreground/30"
+                          isMissing
+                            ? "bg-yellow-500"
+                            : isRunning
+                              ? "bg-green-500"
+                              : "bg-muted-foreground/30"
                         }`}
                       />
                     </div>

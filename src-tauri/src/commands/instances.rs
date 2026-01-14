@@ -251,3 +251,23 @@ pub async fn complete_onboarding(pool: State<'_, DbPool>) -> Result<bool, ()> {
         Err(_) => Ok(false),
     }
 }
+
+/// Check which instance paths exist on disk
+#[tauri::command]
+pub async fn check_instance_paths(paths: Vec<(String, String)>) -> Result<Vec<String>, ()> {
+    // paths is a Vec of (instance_id, path) tuples
+    // Returns Vec of instance_ids whose paths do NOT exist
+    let missing: Vec<String> = paths
+        .into_iter()
+        .filter_map(|(id, path)| {
+            let p = std::path::Path::new(&path);
+            if !p.exists() {
+                Some(id)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(missing)
+}
