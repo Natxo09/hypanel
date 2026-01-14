@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Server, Plus, Play, Square, Loader2, MoreHorizontal, Trash2, FolderOpen, Settings, Download } from "lucide-react";
+import { Server, Plus, Play, Square, Loader2, MoreHorizontal, Trash2, FolderOpen, Settings, Download, Import } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -31,6 +31,7 @@ interface ServersViewProps {
   latestVersion: string | null;
   onSelectInstance: (instance: Instance) => void;
   onAddInstance: () => void;
+  onImportInstance: () => void;
   onDeleteInstance: (instanceId: string) => void;
   onInstanceUpdated: (instanceId: string, newVersion: string) => void;
 }
@@ -43,6 +44,7 @@ export function ServersView({
   latestVersion,
   onSelectInstance,
   onAddInstance,
+  onImportInstance,
   onDeleteInstance,
   onInstanceUpdated,
 }: ServersViewProps) {
@@ -129,10 +131,16 @@ export function ServersView({
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="Servers">
-        <Button onClick={onAddInstance}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Server
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onImportInstance}>
+            <Import className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+          <Button onClick={onAddInstance}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Server
+          </Button>
+        </div>
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto p-4">

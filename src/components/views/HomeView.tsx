@@ -8,6 +8,7 @@ import {
   Power,
   Cpu,
   MemoryStick,
+  Import,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +25,7 @@ interface HomeViewProps {
   outdatedInstances: Map<string, VersionCheckResult>;
   onSelectInstance: (instance: Instance) => void;
   onAddInstance: () => void;
+  onImportInstance: () => void;
   onViewAllServers: () => void;
 }
 
@@ -40,6 +42,7 @@ export function HomeView({
   outdatedInstances,
   onSelectInstance,
   onAddInstance,
+  onImportInstance,
   onViewAllServers,
 }: HomeViewProps) {
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null);
@@ -122,10 +125,16 @@ export function HomeView({
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="Dashboard">
-        <Button onClick={onAddInstance}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Server
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onImportInstance}>
+            <Import className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+          <Button onClick={onAddInstance}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Server
+          </Button>
+        </div>
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">

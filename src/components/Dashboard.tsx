@@ -10,6 +10,7 @@ import { ServerDetailView } from "@/components/views/ServerDetailView";
 import { BackupsView } from "@/components/views/BackupsView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { CreateServerDialog } from "@/components/CreateServerDialog";
+import { ImportServerDialog } from "@/components/ImportServerDialog";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import type { Instance, InstancesListResult, ServerStatusInfo } from "@/lib/types";
@@ -23,6 +24,7 @@ export function Dashboard() {
   const [serverStatuses, setServerStatuses] = useState<Map<string, string>>(new Map());
   const [missingFolders, setMissingFolders] = useState<Set<string>>(new Set());
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   // Version checking
   const {
@@ -32,6 +34,7 @@ export function Dashboard() {
     outdatedInstances,
     dismissBanner,
     markInstanceUpdated,
+    checkInstanceVersion,
   } = useVersionCheck();
 
   // Load instances
@@ -110,11 +113,21 @@ export function Dashboard() {
     setCreateDialogOpen(true);
   }
 
+  function handleImportInstance() {
+    setImportDialogOpen(true);
+  }
+
   function handleServerCreated(newInstance: Instance) {
-    setInstances((prev) => [...prev, newInstance]);
+    console.log("[Dashboard] handleServerCreated called with:", newInstance);
+    setInstances((prev) => {
+      console.log("[Dashboard] Previous instances:", prev.length, "Adding new instance");
+      return [...prev, newInstance];
+    });
     // Optionally navigate to the new server
     setSelectedInstance(newInstance);
     setCurrentView("server");
+    // Check version for the new instance
+    checkInstanceVersion(newInstance.id);
   }
 
   function handleDeleteInstance(instanceId: string) {
@@ -191,6 +204,7 @@ export function Dashboard() {
               outdatedInstances={outdatedInstances}
               onSelectInstance={handleSelectInstance}
               onAddInstance={handleAddInstance}
+              onImportInstance={handleImportInstance}
               onViewAllServers={() => setCurrentView("servers")}
             />
           )}
@@ -204,6 +218,7 @@ export function Dashboard() {
               latestVersion={latestVersion}
               onSelectInstance={handleSelectInstance}
               onAddInstance={handleAddInstance}
+              onImportInstance={handleImportInstance}
               onDeleteInstance={handleDeleteInstance}
               onInstanceUpdated={handleInstanceUpdated}
             />
@@ -214,6 +229,12 @@ export function Dashboard() {
               instance={selectedInstance}
               allInstances={instances}
               onBack={handleBackToServers}
+              onUpdateInstance={(updated) => {
+                setSelectedInstance(updated);
+                setInstances((prev) =>
+                  prev.map((i) => (i.id === updated.id ? updated : i))
+                );
+              }}
             />
           )}
 
@@ -228,6 +249,13 @@ export function Dashboard() {
         onOpenChange={setCreateDialogOpen}
         instances={instances}
         onServerCreated={handleServerCreated}
+      />
+
+      <ImportServerDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        instances={instances}
+        onServerImported={handleServerCreated}
       />
     </div>
   );
