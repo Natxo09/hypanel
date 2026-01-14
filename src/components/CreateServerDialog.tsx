@@ -109,6 +109,9 @@ export function CreateServerDialog({
   const [instancePort, setInstancePort] = useState("5520");
   const [savingInstance, setSavingInstance] = useState(false);
 
+  // Track downloaded version to save with instance
+  const [downloadedVersion, setDownloadedVersion] = useState<string | null>(null);
+
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
@@ -122,6 +125,7 @@ export function CreateServerDialog({
       setCliInstallProgress(null);
       setInstanceName("My Server");
       setInstancePort(findNextAvailablePort(instances).toString());
+      setDownloadedVersion(null);
       loadSystemInfo();
     }
   }, [open, instances]);
@@ -200,6 +204,16 @@ export function CreateServerDialog({
     setDownloadResult(null);
     setStep("progress");
 
+    // Get the version we're about to download
+    try {
+      const versionInfo = await invoke<DownloaderInfo>("get_downloader_version");
+      if (versionInfo.game_version) {
+        setDownloadedVersion(versionInfo.game_version);
+      }
+    } catch (err) {
+      console.warn("Could not get game version:", err);
+    }
+
     const unlisten = await listen<DownloadProgress>("download-progress", (event) => {
       setDownloadProgress(event.payload);
     });
@@ -276,6 +290,16 @@ export function CreateServerDialog({
           });
           result.instance.server_args = serverArgs;
         }
+
+        // If we downloaded files, save the version
+        if (downloadedVersion) {
+          await invoke("update_instance_installed_version", {
+            instanceId: result.instance.id,
+            version: downloadedVersion,
+          });
+          result.instance.installed_version = downloadedVersion;
+        }
+
         onServerCreated(result.instance);
         onOpenChange(false);
       } else {

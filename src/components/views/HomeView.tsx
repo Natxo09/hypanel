@@ -12,14 +12,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { VersionBadge } from "@/components/VersionBadge";
 import { Area, AreaChart, XAxis } from "recharts";
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
-import type { Instance, SystemMetrics, ServerMetrics } from "@/lib/types";
+import type { Instance, SystemMetrics, ServerMetrics, VersionCheckResult } from "@/lib/types";
 
 interface HomeViewProps {
   instances: Instance[];
   serverStatuses: Map<string, string>;
   missingFolders: Set<string>;
+  outdatedInstances: Map<string, VersionCheckResult>;
   onSelectInstance: (instance: Instance) => void;
   onAddInstance: () => void;
   onViewAllServers: () => void;
@@ -35,6 +37,7 @@ export function HomeView({
   instances,
   serverStatuses,
   missingFolders,
+  outdatedInstances,
   onSelectInstance,
   onAddInstance,
   onViewAllServers,
@@ -227,8 +230,17 @@ export function HomeView({
                     onClick={() => onSelectInstance(instance)}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-medium truncate">{instance.name}</p>
-                      <span className="h-2 w-2 rounded-full bg-green-500" />
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-sm font-medium truncate">{instance.name}</p>
+                        {outdatedInstances.has(instance.id) && (
+                          <VersionBadge
+                            installedVersion={outdatedInstances.get(instance.id)?.installed_version ?? null}
+                            availableVersion={outdatedInstances.get(instance.id)?.available_version ?? null}
+                            versionUnknown={outdatedInstances.get(instance.id)?.version_unknown ?? false}
+                          />
+                        )}
+                      </div>
+                      <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
                     </div>
                     <div className="flex items-center gap-4 text-xs">
                       <div>
@@ -320,7 +332,16 @@ export function HomeView({
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{instance.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium truncate">{instance.name}</p>
+                          {outdatedInstances.has(instance.id) && (
+                            <VersionBadge
+                              installedVersion={outdatedInstances.get(instance.id)?.installed_version ?? null}
+                              availableVersion={outdatedInstances.get(instance.id)?.available_version ?? null}
+                              versionUnknown={outdatedInstances.get(instance.id)?.version_unknown ?? false}
+                            />
+                          )}
+                        </div>
                         {isMissing ? (
                           <p className="text-[11px] text-yellow-500">Folder missing</p>
                         ) : (

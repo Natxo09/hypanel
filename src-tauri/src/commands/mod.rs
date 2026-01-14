@@ -6,6 +6,7 @@ pub mod metrics;
 pub mod network;
 pub mod server;
 pub mod system;
+pub mod version;
 
 pub use downloader::*;
 pub use files::*;
@@ -15,3 +16,4 @@ pub use metrics::*;
 pub use network::*;
 pub use server::*;
 pub use system::*;
+pub use version::*;

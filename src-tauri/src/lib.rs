@@ -20,6 +20,10 @@ use commands::{
     get_server_metrics, get_all_server_metrics, get_system_metrics, MetricsState,
     // Network
     get_firewall_info, add_firewall_rule, remove_firewall_rule,
+    // Version checking
+    get_version_settings, set_version_settings, check_all_versions, check_instance_version,
+    update_instance_installed_version, dismiss_version_banner, get_dismissed_version,
+    start_version_check_background_task,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -49,6 +53,14 @@ pub fn run() {
                     }
                 }
             });
+
+            // Start background version check task
+            let bg_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                start_version_check_background_task(bg_handle).await;
+            });
+            println!("[app] Background version check task started");
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -96,7 +108,15 @@ pub fn run() {
             // Network
             get_firewall_info,
             add_firewall_rule,
-            remove_firewall_rule
+            remove_firewall_rule,
+            // Version checking
+            get_version_settings,
+            set_version_settings,
+            check_all_versions,
+            check_instance_version,
+            update_instance_installed_version,
+            dismiss_version_banner,
+            get_dismissed_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

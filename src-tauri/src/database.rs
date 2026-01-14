@@ -89,6 +89,20 @@ async fn run_migrations(pool: &DbPool) -> Result<(), sqlx::Error> {
             .await?;
     }
 
+    // Migration: Add installed_version column to instances table
+    let has_installed_version = sqlx::query("SELECT installed_version FROM instances LIMIT 1")
+        .fetch_optional(pool)
+        .await
+        .is_ok();
+
+    if !has_installed_version {
+        println!("[database] Adding installed_version column to instances table...");
+
+        sqlx::query("ALTER TABLE instances ADD COLUMN installed_version TEXT")
+            .execute(pool)
+            .await?;
+    }
+
     println!("[database] Migrations completed");
 
     Ok(())
@@ -115,6 +129,8 @@ pub struct Instance {
     pub auth_status: Option<String>,        // unknown, authenticated, unauthenticated, offline
     pub auth_persistence: Option<String>,   // memory, encrypted
     pub auth_profile_name: Option<String>,  // e.g. "Natxo"
+    // Version tracking
+    pub installed_version: Option<String>,  // e.g. "0.1.0"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -156,6 +172,7 @@ pub async fn create_instance(pool: &DbPool, input: CreateInstanceInput) -> Resul
         auth_status: Some("unknown".to_string()),
         auth_persistence: Some("memory".to_string()),
         auth_profile_name: None,
+        installed_version: None,
     })
 }
 
@@ -164,7 +181,7 @@ pub async fn get_all_instances(pool: &DbPool) -> Result<Vec<Instance>, sqlx::Err
     let instances = sqlx::query_as::<_, Instance>(
         r#"
         SELECT id, name, path, java_path, jvm_args, server_args, created_at, updated_at,
-               auth_status, auth_persistence, auth_profile_name
+               auth_status, auth_persistence, auth_profile_name, installed_version
         FROM instances
         ORDER BY created_at DESC
         "#
@@ -180,7 +197,7 @@ pub async fn get_instance_by_id(pool: &DbPool, id: &str) -> Result<Option<Instan
     let instance = sqlx::query_as::<_, Instance>(
         r#"
         SELECT id, name, path, java_path, jvm_args, server_args, created_at, updated_at,
-               auth_status, auth_persistence, auth_profile_name
+               auth_status, auth_persistence, auth_profile_name, installed_version
         FROM instances
         WHERE id = ?
         "#
@@ -197,7 +214,7 @@ pub async fn get_instance_by_path(pool: &DbPool, path: &str) -> Result<Option<In
     let instance = sqlx::query_as::<_, Instance>(
         r#"
         SELECT id, name, path, java_path, jvm_args, server_args, created_at, updated_at,
-               auth_status, auth_persistence, auth_profile_name
+               auth_status, auth_persistence, auth_profile_name, installed_version
         FROM instances
         WHERE path = ?
         "#
@@ -348,4 +365,28 @@ pub async fn is_onboarding_completed(pool: &DbPool) -> Result<bool, sqlx::Error>
 /// Mark onboarding as completed
 pub async fn set_onboarding_completed(pool: &DbPool) -> Result<(), sqlx::Error> {
     set_setting(pool, "onboarding_completed", "true").await
+}
+
+// ============================================================================
+// Version tracking operations
+// ============================================================================
+
+/// Update installed version for an instance
+pub async fn update_instance_version(
+    pool: &DbPool,
+    id: &str,
+    version: &str,
+) -> Result<bool, sqlx::Error> {
+    let now = Utc::now().to_rfc3339();
+
+    let result = sqlx::query(
+        "UPDATE instances SET installed_version = ?, updated_at = ? WHERE id = ?"
+    )
+    .bind(version)
+    .bind(&now)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
 }

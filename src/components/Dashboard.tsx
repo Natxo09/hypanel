@@ -10,6 +10,8 @@ import { ServerDetailView } from "@/components/views/ServerDetailView";
 import { BackupsView } from "@/components/views/BackupsView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { CreateServerDialog } from "@/components/CreateServerDialog";
+import { UpdateBanner } from "@/components/UpdateBanner";
+import { useVersionCheck } from "@/hooks/useVersionCheck";
 import type { Instance, InstancesListResult, ServerStatusInfo } from "@/lib/types";
 
 export function Dashboard() {
@@ -21,6 +23,16 @@ export function Dashboard() {
   const [serverStatuses, setServerStatuses] = useState<Map<string, string>>(new Map());
   const [missingFolders, setMissingFolders] = useState<Set<string>>(new Set());
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  // Version checking
+  const {
+    showBanner,
+    latestVersion,
+    outdatedCount,
+    outdatedInstances,
+    dismissBanner,
+    markInstanceUpdated,
+  } = useVersionCheck();
 
   // Load instances
   useEffect(() => {
@@ -119,6 +131,23 @@ export function Dashboard() {
     }
   }
 
+  function handleInstanceUpdated(instanceId: string, newVersion: string) {
+    // Update the instance's installed_version in state
+    setInstances((prev) =>
+      prev.map((i) =>
+        i.id === instanceId ? { ...i, installed_version: newVersion } : i
+      )
+    );
+    // Remove from outdated instances map
+    markInstanceUpdated(instanceId);
+    // Also update selectedInstance if it matches
+    if (selectedInstance?.id === instanceId) {
+      setSelectedInstance((prev) =>
+        prev ? { ...prev, installed_version: newVersion } : prev
+      );
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col h-screen bg-background">
@@ -143,11 +172,23 @@ export function Dashboard() {
             </div>
           )}
 
+          {showBanner && latestVersion && (
+            <div className="m-4 mb-0">
+              <UpdateBanner
+                latestVersion={latestVersion}
+                outdatedCount={outdatedCount}
+                onDismiss={dismissBanner}
+                onViewDetails={() => setCurrentView("servers")}
+              />
+            </div>
+          )}
+
           {currentView === "home" && (
             <HomeView
               instances={instances}
               serverStatuses={serverStatuses}
               missingFolders={missingFolders}
+              outdatedInstances={outdatedInstances}
               onSelectInstance={handleSelectInstance}
               onAddInstance={handleAddInstance}
               onViewAllServers={() => setCurrentView("servers")}
@@ -159,9 +200,12 @@ export function Dashboard() {
               instances={instances}
               serverStatuses={serverStatuses}
               missingFolders={missingFolders}
+              outdatedInstances={outdatedInstances}
+              latestVersion={latestVersion}
               onSelectInstance={handleSelectInstance}
               onAddInstance={handleAddInstance}
               onDeleteInstance={handleDeleteInstance}
+              onInstanceUpdated={handleInstanceUpdated}
             />
           )}
 

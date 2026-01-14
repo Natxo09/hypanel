@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Server, Plus, Play, Square, Loader2, MoreHorizontal, Trash2, FolderOpen, Settings } from "lucide-react";
+import { Server, Plus, Play, Square, Loader2, MoreHorizontal, Trash2, FolderOpen, Settings, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -19,29 +19,39 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DeleteServerDialog } from "@/components/DeleteServerDialog";
-import type { Instance, StartResult, StopResult, ServerMetrics } from "@/lib/types";
+import { UpdateServerDialog } from "@/components/UpdateServerDialog";
+import { VersionBadge } from "@/components/VersionBadge";
+import type { Instance, StartResult, StopResult, ServerMetrics, VersionCheckResult } from "@/lib/types";
 
 interface ServersViewProps {
   instances: Instance[];
   serverStatuses: Map<string, string>;
   missingFolders: Set<string>;
+  outdatedInstances: Map<string, VersionCheckResult>;
+  latestVersion: string | null;
   onSelectInstance: (instance: Instance) => void;
   onAddInstance: () => void;
   onDeleteInstance: (instanceId: string) => void;
+  onInstanceUpdated: (instanceId: string, newVersion: string) => void;
 }
 
 export function ServersView({
   instances,
   serverStatuses,
   missingFolders,
+  outdatedInstances,
+  latestVersion,
   onSelectInstance,
   onAddInstance,
   onDeleteInstance,
+  onInstanceUpdated,
 }: ServersViewProps) {
   const [serverMetrics, setServerMetrics] = useState<Map<string, ServerMetrics>>(new Map());
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [instanceToDelete, setInstanceToDelete] = useState<Instance | null>(null);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [instanceToUpdate, setInstanceToUpdate] = useState<Instance | null>(null);
 
   // Fetch metrics for running servers
   useEffect(() => {
@@ -190,7 +200,16 @@ export function ServersView({
                             />
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium">{instance.name}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-medium">{instance.name}</span>
+                              {outdatedInstances.has(instance.id) && (
+                                <VersionBadge
+                                  installedVersion={outdatedInstances.get(instance.id)?.installed_version ?? null}
+                                  availableVersion={outdatedInstances.get(instance.id)?.available_version ?? null}
+                                  versionUnknown={outdatedInstances.get(instance.id)?.version_unknown ?? false}
+                                />
+                              )}
+                            </div>
                             {isMissing && (
                               <span className="text-[10px] text-yellow-500">Folder missing</span>
                             )}
@@ -270,6 +289,24 @@ export function ServersView({
                             <DropdownMenuContent align="end">
                               {!isMissing && (
                                 <>
+                                  {outdatedInstances.has(instance.id) && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setInstanceToUpdate(instance);
+                                          setUpdateDialogOpen(true);
+                                        }}
+                                        className={outdatedInstances.get(instance.id)?.version_unknown ? "text-yellow-400" : "text-blue-400"}
+                                      >
+                                        <Download className="h-4 w-4" />
+                                        {outdatedInstances.get(instance.id)?.version_unknown
+                                          ? "Verify & update"
+                                          : "Update server"}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  )}
                                   <DropdownMenuItem onClick={(e) => {
                                     e.stopPropagation();
                                     onSelectInstance(instance);
@@ -317,6 +354,15 @@ export function ServersView({
         instance={instanceToDelete}
         onDeleted={onDeleteInstance}
         folderMissing={instanceToDelete ? missingFolders.has(instanceToDelete.id) : false}
+      />
+
+      <UpdateServerDialog
+        open={updateDialogOpen}
+        onOpenChange={setUpdateDialogOpen}
+        instance={instanceToUpdate}
+        availableVersion={latestVersion}
+        versionUnknown={instanceToUpdate ? outdatedInstances.get(instanceToUpdate.id)?.version_unknown : false}
+        onUpdated={onInstanceUpdated}
       />
     </div>
   );

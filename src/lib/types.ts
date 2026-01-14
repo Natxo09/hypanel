@@ -95,6 +95,8 @@ export interface Instance {
   auth_status: string | null;        // unknown, authenticated, unauthenticated, offline
   auth_persistence: string | null;   // memory, encrypted
   auth_profile_name: string | null;  // e.g. "Natxo"
+  // Version tracking
+  installed_version: string | null;  // e.g. "0.1.0"
 }
 
 export interface InstanceResult {
@@ -232,4 +234,25 @@ export interface LogFilesResult {
   success: boolean;
   files: LogFile[];
   error: string | null;
+}
+
+// Version checking types
+export interface VersionSettings {
+  check_on_startup: boolean;
+  check_periodic: boolean;
+  check_on_server_start: boolean;
+}
+
+export interface VersionCheckResult {
+  instance_id: string;
+  instance_name: string;
+  installed_version: string | null;
+  available_version: string | null;
+  update_available: boolean;
+  version_unknown: boolean;
+}
+
+export interface VersionUpdateEvent {
+  results: VersionCheckResult[];
+  available_version: string;
 }
