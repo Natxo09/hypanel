@@ -1,3 +1,4 @@
+pub mod config;
 pub mod downloader;
 pub mod files;
 pub mod instances;
@@ -7,7 +8,9 @@ pub mod network;
 pub mod server;
 pub mod system;
 pub mod version;
+pub mod worlds;
 
+pub use config::*;
 pub use downloader::*;
 pub use files::*;
 pub use instances::*;
@@ -17,3 +20,4 @@ pub use network::*;
 pub use server::*;
 pub use system::*;
 pub use version::*;
+pub use worlds::*;

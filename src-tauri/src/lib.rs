@@ -24,6 +24,14 @@ use commands::{
     get_version_settings, set_version_settings, check_all_versions, check_instance_version,
     update_instance_installed_version, dismiss_version_banner, get_dismissed_version,
     start_version_check_background_task,
+    // Config files
+    read_json_file, write_json_file, write_json_file_raw,
+    get_whitelist, save_whitelist,
+    get_bans, save_bans,
+    get_permissions, save_permissions,
+    get_server_config, save_server_config,
+    // Worlds
+    list_worlds, get_world_config, save_world_config, delete_world, duplicate_world,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -133,7 +141,25 @@ pub fn run() {
             check_instance_version,
             update_instance_installed_version,
             dismiss_version_banner,
-            get_dismissed_version
+            get_dismissed_version,
+            // Config files
+            read_json_file,
+            write_json_file,
+            write_json_file_raw,
+            get_whitelist,
+            save_whitelist,
+            get_bans,
+            save_bans,
+            get_permissions,
+            save_permissions,
+            get_server_config,
+            save_server_config,
+            // Worlds
+            list_worlds,
+            get_world_config,
+            save_world_config,
+            delete_world,
+            duplicate_world
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

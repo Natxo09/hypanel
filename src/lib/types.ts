@@ -256,3 +256,155 @@ export interface VersionUpdateEvent {
   results: VersionCheckResult[];
   available_version: string;
 }
+
+// ============================================================================
+// Config Files Types
+// ============================================================================
+
+// Generic JSON result
+export interface JsonReadResult {
+  success: boolean;
+  content: unknown | null;
+  raw: string | null;
+  error: string | null;
+}
+
+export interface JsonWriteResult {
+  success: boolean;
+  error: string | null;
+}
+
+// Whitelist
+export interface Whitelist {
+  enabled: boolean;
+  list: string[];
+}
+
+export interface WhitelistResult {
+  success: boolean;
+  whitelist: Whitelist | null;
+  error: string | null;
+}
+
+// Bans
+export interface Ban {
+  uuid: string;
+  name?: string;
+  reason?: string;
+  bannedAt?: string;
+  bannedBy?: string;
+}
+
+export interface BansResult {
+  success: boolean;
+  bans: Ban[] | null;
+  error: string | null;
+}
+
+// Permissions
+export interface UserPermissions {
+  groups: string[];
+}
+
+export interface Permissions {
+  users: Record<string, UserPermissions>;
+  groups: Record<string, string[]>;
+}
+
+export interface PermissionsResult {
+  success: boolean;
+  permissions: Permissions | null;
+  error: string | null;
+}
+
+// Server Config
+export interface ServerConfigDefaults {
+  World: string;
+  GameMode: string;
+}
+
+export interface ServerConfig {
+  Version: number;
+  ServerName: string;
+  MOTD: string;
+  Password: string;
+  MaxPlayers: number;
+  MaxViewRadius: number;
+  LocalCompressionEnabled: boolean;
+  Defaults: ServerConfigDefaults;
+  // Extra fields stored as raw JSON
+  [key: string]: unknown;
+}
+
+export interface ServerConfigResult {
+  success: boolean;
+  config: ServerConfig | null;
+  raw: string | null;
+  error: string | null;
+}
+
+// ============================================================================
+// Worlds Types
+// ============================================================================
+
+export interface WorldInfo {
+  name: string;
+  path: string;
+  uuid: string | null;
+  seed: number | null;
+  world_gen_type: string | null;
+  world_gen_name: string | null;
+  is_ticking: boolean | null;
+  is_pvp_enabled: boolean | null;
+}
+
+export interface WorldsListResult {
+  success: boolean;
+  worlds: WorldInfo[];
+  error: string | null;
+}
+
+export interface WorldUUID {
+  $binary: string;
+  $type: string;
+}
+
+export interface WorldGenConfig {
+  Type: string;
+  Name: string;
+}
+
+export interface WorldConfig {
+  Version: number;
+  UUID: WorldUUID;
+  Seed: number;
+  WorldGen: WorldGenConfig;
+  // Boolean toggles
+  IsTicking: boolean;
+  IsBlockTicking: boolean;
+  IsPvpEnabled: boolean;
+  IsFallDamageEnabled: boolean;
+  IsGameTimePaused: boolean;
+  IsSpawningNPC: boolean;
+  IsSpawnMarkersEnabled: boolean;
+  IsAllNPCFrozen: boolean;
+  IsSavingPlayers: boolean;
+  IsSavingChunks: boolean;
+  IsUnloadingChunks: boolean;
+  IsObjectiveMarkersEnabled: boolean;
+  IsCompassUpdating: boolean;
+  DeleteOnUniverseStart: boolean;
+  DeleteOnRemove: boolean;
+  // String fields
+  GameplayConfig: string;
+  GameTime?: string;
+  // Extra fields
+  [key: string]: unknown;
+}
+
+export interface WorldConfigResult {
+  success: boolean;
+  config: WorldConfig | null;
+  raw: string | null;
+  error: string | null;
+}

@@ -12,6 +12,8 @@ import {
   Settings,
   Activity,
   Users,
+  FileJson,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +24,8 @@ import {
   SettingsTab,
   MetricsTab,
   PlayersTab,
+  FilesTab,
+  WorldsTab,
   type MetricDataPoint,
 } from "./server-detail";
 import { useConsoleStore, type ConsoleMessage } from "@/lib/console-store";
@@ -709,6 +713,14 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
                 <Activity className="h-3.5 w-3.5" />
                 Metrics
               </TabsTrigger>
+              <TabsTrigger value="files" className="gap-1.5">
+                <FileJson className="h-3.5 w-3.5" />
+                Files
+              </TabsTrigger>
+              <TabsTrigger value="worlds" className="gap-1.5">
+                <Globe className="h-3.5 w-3.5" />
+                Worlds
+              </TabsTrigger>
             </TabsList>
 
             <div className="flex items-center gap-2">
@@ -884,6 +896,16 @@ export function ServerDetailView({ instance: initialInstance, allInstances, onBa
               players={onlinePlayers}
               onRefresh={handleRefreshPlayers}
             />
+          </TabsContent>
+
+          {/* Files Tab */}
+          <TabsContent value="files" className="flex-1 overflow-auto mt-0">
+            <FilesTab instance={instance} serverStatus={status} />
+          </TabsContent>
+
+          {/* Worlds Tab */}
+          <TabsContent value="worlds" className="flex-1 overflow-auto mt-0">
+            <WorldsTab instance={instance} serverStatus={status} />
           </TabsContent>
         </Tabs>
       </div>
