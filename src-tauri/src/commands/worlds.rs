@@ -118,7 +118,7 @@ pub struct WorldConfigResult {
 /// List all worlds in the server's universe directory
 #[tauri::command]
 pub fn list_worlds(instance_path: String) -> WorldsListResult {
-    let worlds_dir = Path::new(&instance_path).join("universe").join("worlds");
+    let worlds_dir = Path::new(&instance_path).join("Server").join("universe").join("worlds");
 
     if !worlds_dir.exists() {
         return WorldsListResult {

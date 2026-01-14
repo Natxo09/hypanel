@@ -256,7 +256,7 @@ pub fn write_json_file_raw(file_path: String, content: String) -> JsonWriteResul
 /// Get whitelist from server instance
 #[tauri::command]
 pub fn get_whitelist(instance_path: String) -> WhitelistResult {
-    let path = Path::new(&instance_path).join("whitelist.json");
+    let path = Path::new(&instance_path).join("Server").join("whitelist.json");
 
     if !path.exists() {
         // Return default whitelist if file doesn't exist
@@ -296,7 +296,7 @@ pub fn get_whitelist(instance_path: String) -> WhitelistResult {
 /// Save whitelist to server instance
 #[tauri::command]
 pub fn save_whitelist(instance_path: String, whitelist: Whitelist) -> JsonWriteResult {
-    let path = Path::new(&instance_path).join("whitelist.json");
+    let path = Path::new(&instance_path).join("Server").join("whitelist.json");
 
     println!("[DEBUG] save_whitelist - Full path: {:?}", path);
     println!("[DEBUG] save_whitelist - Path exists: {}", path.exists());
@@ -343,7 +343,7 @@ pub fn save_whitelist(instance_path: String, whitelist: Whitelist) -> JsonWriteR
 /// Get bans from server instance
 #[tauri::command]
 pub fn get_bans(instance_path: String) -> BansResult {
-    let path = Path::new(&instance_path).join("bans.json");
+    let path = Path::new(&instance_path).join("Server").join("bans.json");
 
     if !path.exists() {
         // Return empty bans list if file doesn't exist
@@ -380,7 +380,7 @@ pub fn get_bans(instance_path: String) -> BansResult {
 /// Save bans to server instance
 #[tauri::command]
 pub fn save_bans(instance_path: String, bans: Vec<Ban>) -> JsonWriteResult {
-    let path = Path::new(&instance_path).join("bans.json");
+    let path = Path::new(&instance_path).join("Server").join("bans.json");
 
     let formatted = match serde_json::to_string_pretty(&bans) {
         Ok(s) => s,
@@ -411,7 +411,7 @@ pub fn save_bans(instance_path: String, bans: Vec<Ban>) -> JsonWriteResult {
 /// Get permissions from server instance
 #[tauri::command]
 pub fn get_permissions(instance_path: String) -> PermissionsResult {
-    let path = Path::new(&instance_path).join("permissions.json");
+    let path = Path::new(&instance_path).join("Server").join("permissions.json");
 
     if !path.exists() {
         // Return default permissions if file doesn't exist
@@ -455,7 +455,7 @@ pub fn get_permissions(instance_path: String) -> PermissionsResult {
 /// Save permissions to server instance
 #[tauri::command]
 pub fn save_permissions(instance_path: String, permissions: Permissions) -> JsonWriteResult {
-    let path = Path::new(&instance_path).join("permissions.json");
+    let path = Path::new(&instance_path).join("Server").join("permissions.json");
 
     let formatted = match serde_json::to_string_pretty(&permissions) {
         Ok(s) => s,
@@ -486,7 +486,7 @@ pub fn save_permissions(instance_path: String, permissions: Permissions) -> Json
 /// Get server config from instance
 #[tauri::command]
 pub fn get_server_config(instance_path: String) -> ServerConfigResult {
-    let path = Path::new(&instance_path).join("config.json");
+    let path = Path::new(&instance_path).join("Server").join("config.json");
 
     if !path.exists() {
         return ServerConfigResult {
@@ -526,7 +526,7 @@ pub fn get_server_config(instance_path: String) -> ServerConfigResult {
 /// Save server config to instance
 #[tauri::command]
 pub fn save_server_config(instance_path: String, config: ServerConfig) -> JsonWriteResult {
-    let path = Path::new(&instance_path).join("config.json");
+    let path = Path::new(&instance_path).join("Server").join("config.json");
 
     let formatted = match serde_json::to_string_pretty(&config) {
         Ok(s) => s,
