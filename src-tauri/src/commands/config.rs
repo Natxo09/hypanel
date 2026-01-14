@@ -298,8 +298,14 @@ pub fn get_whitelist(instance_path: String) -> WhitelistResult {
 pub fn save_whitelist(instance_path: String, whitelist: Whitelist) -> JsonWriteResult {
     let path = Path::new(&instance_path).join("whitelist.json");
 
+    println!("[DEBUG] save_whitelist - Full path: {:?}", path);
+    println!("[DEBUG] save_whitelist - Path exists: {}", path.exists());
+
     let formatted = match serde_json::to_string_pretty(&whitelist) {
-        Ok(s) => s,
+        Ok(s) => {
+            println!("[DEBUG] save_whitelist - Serialized content: {}", s);
+            s
+        },
         Err(e) => {
             return JsonWriteResult {
                 success: false,
@@ -308,14 +314,24 @@ pub fn save_whitelist(instance_path: String, whitelist: Whitelist) -> JsonWriteR
         }
     };
 
-    match fs::write(path, formatted) {
-        Ok(()) => JsonWriteResult {
-            success: true,
-            error: None,
+    match fs::write(&path, &formatted) {
+        Ok(()) => {
+            println!("[DEBUG] save_whitelist - Write successful!");
+            // Verify by reading back
+            if let Ok(content) = fs::read_to_string(&path) {
+                println!("[DEBUG] save_whitelist - Read back: {}", content);
+            }
+            JsonWriteResult {
+                success: true,
+                error: None,
+            }
         },
-        Err(e) => JsonWriteResult {
-            success: false,
-            error: Some(format!("Failed to write whitelist.json: {}", e)),
+        Err(e) => {
+            println!("[DEBUG] save_whitelist - Write error: {}", e);
+            JsonWriteResult {
+                success: false,
+                error: Some(format!("Failed to write whitelist.json: {}", e)),
+            }
         },
     }
 }
