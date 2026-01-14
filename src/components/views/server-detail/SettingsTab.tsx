@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { JvmSettingsSection } from "./JvmSettingsSection";
 import { ServerArgsSection, type ServerArgsSettings, type UsedPort } from "./ServerArgsSection";
 import { CommandPreview } from "./CommandPreview";
+import { NetworkSection } from "./NetworkSection";
 import type { Instance, SystemMetrics } from "@/lib/types";
 
 // Helper to extract port from server_args string
@@ -321,6 +322,14 @@ export function SettingsTab({
           instancePath={instance.path}
           usedPorts={usedPorts}
           onChange={handleServerArgsChange}
+        />
+      </div>
+
+      {/* Network / Firewall */}
+      <div className="rounded-lg border bg-card p-4">
+        <NetworkSection
+          serverName={settingsForm.name || instance.name}
+          port={parseInt(serverArgsSettings.bindPort) || 5520}
         />
       </div>
 

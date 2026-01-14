@@ -17,6 +17,8 @@ use commands::{
     list_log_files, read_log_file, tail_log_file,
     // Metrics
     get_server_metrics, get_all_server_metrics, get_system_metrics, MetricsState,
+    // Network
+    get_firewall_info, add_firewall_rule, remove_firewall_rule,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -87,7 +89,11 @@ pub fn run() {
             // Metrics
             get_server_metrics,
             get_all_server_metrics,
-            get_system_metrics
+            get_system_metrics,
+            // Network
+            get_firewall_info,
+            add_firewall_rule,
+            remove_firewall_rule
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

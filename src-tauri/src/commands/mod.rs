@@ -3,6 +3,7 @@ pub mod files;
 pub mod instances;
 pub mod logs;
 pub mod metrics;
+pub mod network;
 pub mod server;
 pub mod system;
 
@@ -11,5 +12,6 @@ pub use files::*;
 pub use instances::*;
 pub use logs::*;
 pub use metrics::*;
+pub use network::*;
 pub use server::*;
 pub use system::*;
