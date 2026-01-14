@@ -276,6 +276,20 @@ export function Onboarding() {
     }
   }
 
+  async function skipServerSetup() {
+    setSavingInstance(true);
+    try {
+      // Mark onboarding as complete without creating a server
+      await invoke<boolean>("complete_onboarding");
+      window.location.reload();
+    } catch (err) {
+      console.error("Error skipping setup:", err);
+      window.location.reload();
+    } finally {
+      setSavingInstance(false);
+    }
+  }
+
   const canProceedFromStep1 = java?.is_valid;
   const canProceedFromStep2 = selectedSource !== null;
   const canProceedFromStep3 = copyResult?.success || downloadResult?.success || serverFilesStatus?.exists || false;
@@ -497,18 +511,31 @@ export function Onboarding() {
               </button>
             </CardContent>
 
-            <CardFooter className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(0)} className="flex-1">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
+            <CardFooter className="flex flex-col gap-3">
+              <div className="flex gap-3 w-full">
+                <Button variant="outline" onClick={() => setStep(0)} className="flex-1">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
+                <Button
+                  onClick={() => setStep(2)}
+                  disabled={!canProceedFromStep2}
+                  className="flex-1"
+                >
+                  Continue
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
               <Button
-                onClick={() => setStep(2)}
-                disabled={!canProceedFromStep2}
-                className="flex-1"
+                variant="ghost"
+                onClick={skipServerSetup}
+                disabled={savingInstance}
+                className="w-full text-muted-foreground"
               >
-                Continue
-                <ArrowRight className="w-4 h-4 ml-2" />
+                {savingInstance ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Skip for now - I'll create a server later
               </Button>
             </CardFooter>
           </Card>

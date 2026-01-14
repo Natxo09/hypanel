@@ -125,7 +125,7 @@ pub fn read_log_file(
         };
     }
 
-    let file_size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let file_size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
     let file = match File::open(path) {
         Ok(f) => f,
@@ -200,7 +200,7 @@ pub fn tail_log_file(
         };
     }
 
-    let file_size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let file_size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
     // If file hasn't grown, return empty
     if file_size <= from_byte {
