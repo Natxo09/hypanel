@@ -32,17 +32,19 @@ import type {
   StopResult,
   AuthEvent,
   ServerMetrics,
+  SystemMetrics,
   LogFile,
   LogReadResult,
 } from "@/lib/types";
 
 interface ServerDetailViewProps {
   instance: Instance;
+  allInstances: Instance[];
   onBack: () => void;
   onUpdateInstance?: (instance: Instance) => void;
 }
 
-export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerDetailViewProps) {
+export function ServerDetailView({ instance, allInstances, onBack, onUpdateInstance }: ServerDetailViewProps) {
   // Console store (persists across navigation)
   const consoleStore = useConsoleStore();
 
@@ -87,10 +89,17 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
   // Metrics state
   const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
   const [metricsHistory, setMetricsHistory] = useState<MetricDataPoint[]>([]);
+  const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null);
 
   // Add message to console (using store)
   const addConsoleMessage = useCallback((text: string, type: ConsoleMessage["type"]) => {
     consoleStore.addMessage(instance.id, text, type);
+    setConsoleRefreshKey((k) => k + 1);
+  }, [consoleStore, instance.id]);
+
+  // Clear console
+  const clearConsole = useCallback(() => {
+    consoleStore.clearMessages(instance.id);
     setConsoleRefreshKey((k) => k + 1);
   }, [consoleStore, instance.id]);
 
@@ -110,6 +119,19 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
     }
     fetchStatus();
   }, [instance.id]);
+
+  // Fetch system metrics (for settings tab memory configuration)
+  useEffect(() => {
+    async function fetchSystemMetrics() {
+      try {
+        const sysMetrics = await invoke<SystemMetrics>("get_system_metrics");
+        setSystemMetrics(sysMetrics);
+      } catch (err) {
+        console.error("Failed to get system metrics:", err);
+      }
+    }
+    fetchSystemMetrics();
+  }, []);
 
   // Subscribe to events - use ref to avoid stale closures
   const addMessageRef = useRef(addConsoleMessage);
@@ -273,7 +295,8 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
 
   // Start server
   async function handleStart() {
-    // Don't clear console - keep history for reference
+    // Clear console on start for a fresh view
+    clearConsole();
     addConsoleMessage("Starting server...", "system");
 
     try {
@@ -523,6 +546,7 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
               onCommandChange={setCommandInput}
               onSendCommand={handleSendCommand}
               onKeyDown={handleKeyDown}
+              onClear={clearConsole}
             />
           </TabsContent>
 
@@ -543,6 +567,8 @@ export function ServerDetailView({ instance, onBack, onUpdateInstance }: ServerD
             <SettingsTab
               instance={instance}
               settingsForm={settingsForm}
+              systemMetrics={systemMetrics}
+              allInstances={allInstances}
               isSaving={isSavingSettings}
               onFormChange={(updates) => setSettingsForm((s) => ({ ...s, ...updates }))}
               onSave={handleSaveSettings}

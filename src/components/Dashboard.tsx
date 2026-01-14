@@ -134,7 +134,11 @@ export function Dashboard() {
           )}
 
           {currentView === "server" && selectedInstance && (
-            <ServerDetailView instance={selectedInstance} onBack={handleBackToServers} />
+            <ServerDetailView
+              instance={selectedInstance}
+              allInstances={instances}
+              onBack={handleBackToServers}
+            />
           )}
 
           {currentView === "backups" && <BackupsView />}

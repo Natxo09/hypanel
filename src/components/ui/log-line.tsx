@@ -99,14 +99,33 @@ export function LogLine({ line, showTimestamp = true, className = "" }: LogLineP
   );
 }
 
+// Highlight search matches in text
+function highlightText(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escapedQuery})`, "gi"));
+
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase() ? (
+      <mark key={i} className="bg-yellow-500/40 text-yellow-200 rounded px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
 // Compact version for console output (without full timestamp parsing, just colorize)
 interface ConsoleLineProps {
   text: string;
   type: "stdout" | "stderr" | "system" | "command";
   className?: string;
+  searchQuery?: string;
 }
 
-export function ConsoleLine({ text, type, className = "" }: ConsoleLineProps) {
+export function ConsoleLine({ text, type, className = "", searchQuery = "" }: ConsoleLineProps) {
   // For stdout, try to parse as Hytale log
   if (type === "stdout") {
     const parsed = parseLogLine(text);
@@ -127,7 +146,9 @@ export function ConsoleLine({ text, type, className = "" }: ConsoleLineProps) {
           {" "}
           <span className="text-purple-400">[{parsed.module}]</span>
           {" "}
-          <span className="text-zinc-300">{parsed.message}</span>
+          <span className="text-zinc-300">
+            {searchQuery ? highlightText(parsed.message, searchQuery) : parsed.message}
+          </span>
         </div>
       );
     }
@@ -135,7 +156,7 @@ export function ConsoleLine({ text, type, className = "" }: ConsoleLineProps) {
     // Plain stdout without Hytale format - use parsed.message which has ANSI stripped
     return (
       <div className={`whitespace-pre-wrap break-all leading-relaxed text-zinc-300 ${className}`}>
-        {parsed.message}
+        {searchQuery ? highlightText(parsed.message, searchQuery) : parsed.message}
       </div>
     );
   }
@@ -150,7 +171,7 @@ export function ConsoleLine({ text, type, className = "" }: ConsoleLineProps) {
 
   return (
     <div className={`whitespace-pre-wrap break-all leading-relaxed py-0.5 ${typeColors[type]} ${className}`}>
-      {cleanText}
+      {searchQuery ? highlightText(cleanText, searchQuery) : cleanText}
     </div>
   );
 }
